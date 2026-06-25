@@ -103,7 +103,7 @@ namespace
 			Py_RETURN_NONE;
 		}
 
-		return PyUnicode_FromString(TCHAR_TO_UTF8(*Resolved->GetName()));
+		return PyUnicode_FromString(TCHAR_TO_UTF8(*Resolved->GetPathName()));
 	}
 
 	PyObject* PyGetComponentByWidget(PyObject* /*Self*/, PyObject* Args)
@@ -157,7 +157,7 @@ bool RegisterPythonCoreType(PyObject* Module)
 	return FPythonUtilities::AddStaticMethodType(
 		Module,
 		"Core",
-		"widget_markup.Core",
+		"_widget_markup.Core",
 		CoreMethods,
 		"WidgetMarkup core utilities (class resolution, component lookup).");
 }

@@ -17,6 +17,5 @@ class IUserObjectListEntry(IUserListEntry):
         """Return the raw Python value this entry represents in the owning ListView."""
         entry = self._widget_markup_user_widget.get_entry_list_item()
         if entry is not None:
-            return widget_markup.WidgetLibrary.get_python_object_from_list_item(
-                str(entry.get_path_name()))
+            return widget_markup.WidgetLibrary.get_python_object_from_list_item(entry)
         return None

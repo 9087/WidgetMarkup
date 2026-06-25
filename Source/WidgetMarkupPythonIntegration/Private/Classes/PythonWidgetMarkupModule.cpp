@@ -13,7 +13,7 @@
 
 namespace
 {
-	const char* NativeModuleName = "widget_markup";
+	const char* NativeModuleName = "_widget_markup";
 
 	PyMethodDef NativeModuleMethods[] =
 	{

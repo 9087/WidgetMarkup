@@ -20,7 +20,7 @@ class TestDynamicChild(TestComponent):
 
             # Dynamic add_child via C++ API with class token string.
             child_name = widget_markup.WidgetLibrary.add_child_widget(
-                str(uw.get_path_name()), "RootCanvas", "TextBlock", "DynTextBlock")
+                uw, "RootCanvas", "TextBlock", "DynTextBlock")
             self.check_not_none(child_name, "add_child_widget returns child name")
             self.check_true(isinstance(child_name, str), "returned value is string")
 

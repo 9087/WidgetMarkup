@@ -283,7 +283,7 @@ bool RegisterPythonDataBindingType(PyObject* Module)
 	return FPythonUtilities::AddStaticMethodType(
 		Module,
 		"DataBinding",
-		"widget_markup.DataBinding",
+		"_widget_markup.DataBinding",
 		DataBindingMethods,
 		"WidgetMarkup data-binding helpers.");
 }

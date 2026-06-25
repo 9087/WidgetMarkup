@@ -1,0 +1,20 @@
+"""Wrapper for _widget_markup.Application (no PathName conversion needed)."""
+
+import sys as _sys
+
+_wm = _sys.modules["_widget_markup"]
+_Application = _wm.Application
+
+
+class Application:
+    """Wrapper for _widget_markup.Application (no PathName conversion needed)."""
+
+    @staticmethod
+    def get_extra_arguments() -> str:
+        """Get the current WidgetMarkupApp extra arguments string."""
+        return _Application.get_extra_arguments()
+
+    @staticmethod
+    def request_shutdown():
+        """Request engine exit (for standalone programs)."""
+        return _Application.request_shutdown()

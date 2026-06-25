@@ -263,7 +263,7 @@ bool RegisterPythonWidgetLibraryType(PyObject* Module)
 	return FPythonUtilities::AddStaticMethodType(
 		Module,
 		"WidgetLibrary",
-		"widget_markup.WidgetLibrary",
+		"_widget_markup.WidgetLibrary",
 		WidgetLibraryMethods,
 		"WidgetMarkup widget lookup helpers.");
 }

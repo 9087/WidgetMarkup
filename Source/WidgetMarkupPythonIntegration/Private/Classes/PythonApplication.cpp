@@ -33,7 +33,7 @@ bool RegisterPythonApplicationType(PyObject* Module)
 	return FPythonUtilities::AddStaticMethodType(
 		Module,
 		"Application",
-		"widget_markup.Application",
+		"_widget_markup.Application",
 		ApplicationMethods,
 		"WidgetMarkupApp application helpers.");
 }

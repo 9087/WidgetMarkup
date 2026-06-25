@@ -300,12 +300,7 @@ class WidgetMarkupComponent:
             return
 
         value = getattr(self, binding.source_expression)
-        widget_markup.DataBinding.apply_property_binding(
-            str(user_widget.get_path_name()),
-            binding.source_expression,
-            str(binding.target_object_name),
-            str(binding.target_property_path),
-            value)
+        widget_markup.DataBinding.apply_property_binding(user_widget, binding, value)
 
     def apply_delegate_bindings(self) -> None:
         user_widget = getattr(self, _USER_WIDGET_ATTR, None)
@@ -391,12 +386,7 @@ class WidgetMarkupComponent:
         bindings = extension.get_property_bindings()
         for binding in bindings:
             if binding.source_expression == property_name:
-                widget_markup.DataBinding.apply_property_binding(
-                    str(user_widget.get_path_name()),
-                    binding.source_expression,
-                    str(binding.target_object_name),
-                    str(binding.target_property_path),
-                    value)
+                widget_markup.DataBinding.apply_property_binding(user_widget, binding, value)
                 return
 
     def refresh(self, data: Any) -> None:
@@ -424,11 +414,9 @@ class WidgetMarkupComponent:
         user_widget = getattr(self, _USER_WIDGET_ATTR, None)
         if user_widget is None:
             return None
-        path = widget_markup.WidgetLibrary.find_widget_in_user_widget(
-            str(user_widget.get_path_name()), name)
-        if path is None:
-            return None
-        return unreal.find_object(None, path)
+        widget = widget_markup.WidgetLibrary.find_widget_in_user_widget(
+            user_widget, name)
+        return widget
 
     def add_child(self, name: str, cls: Any, parent: Any) -> Any:
         """Add a child widget component to a parent panel widget.
@@ -455,7 +443,7 @@ class WidgetMarkupComponent:
 
         class_token = cls if isinstance(cls, str) else str(cls.get_name())
         child_name = widget_markup.WidgetLibrary.add_child_widget(
-            str(user_widget.get_path_name()), parent_name_or_path, class_token, name)
+            user_widget, parent_name_or_path, class_token, name)
 
         if child_name is None:
             return None
@@ -463,7 +451,7 @@ class WidgetMarkupComponent:
         child_widget = self.find_widget(child_name)
         if child_widget is None:
             return None
-        return widget_markup.Core.get_component_by_widget(str(child_widget.get_path_name()))
+        return widget_markup.Core.get_component_by_widget(child_widget)
 
     def remove_child(self, child: Any) -> bool:
         """Remove a child widget.
@@ -478,17 +466,16 @@ class WidgetMarkupComponent:
         if user_widget is None:
             return False
 
-        user_widget_path = str(user_widget.get_path_name())
         if isinstance(child, str):
-            return widget_markup.WidgetLibrary.remove_child_widget(user_widget_path, child)
+            return widget_markup.WidgetLibrary.remove_child_widget(user_widget, child)
 
         # Try to extract the UserWidget from a component.
         child_widget = getattr(child, _USER_WIDGET_ATTR, None)
         if child_widget is not None:
-            return widget_markup.WidgetLibrary.remove_child_widget(user_widget_path, str(child_widget.get_path_name()))
+            return widget_markup.WidgetLibrary.remove_child_widget(user_widget, str(child_widget.get_path_name()))
 
         # Assume child is already a UWidget.
-        return widget_markup.WidgetLibrary.remove_child_widget(user_widget_path, str(child.get_path_name()))
+        return widget_markup.WidgetLibrary.remove_child_widget(user_widget, str(child.get_path_name()))
 
     def get_child(self, name: str) -> Any:
         """Get a child WidgetMarkupComponent by name.
@@ -506,4 +493,4 @@ class WidgetMarkupComponent:
         widget = self.find_widget(name)
         if widget is None:
             return None
-        return widget_markup.Core.get_component_by_widget(str(widget.get_path_name()))
+        return widget_markup.Core.get_component_by_widget(widget)
