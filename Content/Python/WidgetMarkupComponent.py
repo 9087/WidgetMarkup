@@ -300,7 +300,12 @@ class WidgetMarkupComponent:
             return
 
         value = getattr(self, binding.source_expression)
-        widget_markup.DataBinding.apply_property_binding(user_widget, binding, value)
+        widget_markup.DataBinding.apply_property_binding(
+            str(user_widget.get_path_name()),
+            binding.source_expression,
+            str(binding.target_object_name),
+            str(binding.target_property_path),
+            value)
 
     def apply_delegate_bindings(self) -> None:
         user_widget = getattr(self, _USER_WIDGET_ATTR, None)
@@ -386,7 +391,12 @@ class WidgetMarkupComponent:
         bindings = extension.get_property_bindings()
         for binding in bindings:
             if binding.source_expression == property_name:
-                widget_markup.DataBinding.apply_property_binding(user_widget, binding, value)
+                widget_markup.DataBinding.apply_property_binding(
+                    str(user_widget.get_path_name()),
+                    binding.source_expression,
+                    str(binding.target_object_name),
+                    str(binding.target_property_path),
+                    value)
                 return
 
     def refresh(self, data: Any) -> None:
@@ -453,7 +463,7 @@ class WidgetMarkupComponent:
         child_widget = self.find_widget(child_name)
         if child_widget is None:
             return None
-        return widget_markup.Core.get_component_by_widget(child_widget)
+        return widget_markup.Core.get_component_by_widget(str(child_widget.get_path_name()))
 
     def remove_child(self, child: Any) -> bool:
         """Remove a child widget.
@@ -496,4 +506,4 @@ class WidgetMarkupComponent:
         widget = self.find_widget(name)
         if widget is None:
             return None
-        return widget_markup.Core.get_component_by_widget(widget)
+        return widget_markup.Core.get_component_by_widget(str(widget.get_path_name()))

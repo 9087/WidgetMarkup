@@ -8,7 +8,6 @@
 #include "Extensions/WidgetMarkupUserWidgetExtension.h"
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
-#include "PyConversion.h"
 #include "PythonUtilities.h"
 #include "PythonWidgetMarkupComponent.h"
 #include "UObject/UObjectIterator.h"
@@ -104,25 +103,18 @@ namespace
 			Py_RETURN_NONE;
 		}
 
-		return PyConversion::PythonizeObject(Resolved);
+		return PyUnicode_FromString(TCHAR_TO_UTF8(*Resolved->GetName()));
 	}
 
 	PyObject* PyGetComponentByWidget(PyObject* /*Self*/, PyObject* Args)
 	{
-		PyObject* PyWidget = nullptr;
-		if (!PyArg_ParseTuple(Args, "O:get_component_by_widget", &PyWidget))
+		const char* WidgetPathName = nullptr;
+		if (!PyArg_ParseTuple(Args, "s:get_component_by_widget", &WidgetPathName))
 		{
 			return nullptr;
 		}
 
-		UObject* WidgetObject = nullptr;
-		if (!PyConversion::NativizeObject(PyWidget, WidgetObject, UWidget::StaticClass()))
-		{
-			PyErr_SetString(PyExc_TypeError, "Argument must be a UWidget.");
-			return nullptr;
-		}
-
-		UWidget* Widget = Cast<UWidget>(WidgetObject);
+		UWidget* Widget = FindObject<UWidget>(nullptr, UTF8_TO_TCHAR(WidgetPathName));
 		if (!Widget)
 		{
 			Py_RETURN_NONE;

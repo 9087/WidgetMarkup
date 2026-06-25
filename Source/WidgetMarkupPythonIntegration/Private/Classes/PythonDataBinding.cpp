@@ -9,7 +9,6 @@
 #include "ElementNodes/PropertyChainHandle.h"
 #include "Modules/ModuleManager.h"
 #include "PropertyBuffer.h"
-#include "PyConversion.h"
 #include "PythonUtilities.h"
 #include "PythonWidgetMarkupListItem.h"
 #include "Utilities/WidgetPropertyPath.h"
@@ -169,27 +168,22 @@ namespace
 
 	PyObject* PyApplyPropertyBinding(PyObject* /*Self*/, PyObject* Args)
 	{
-		PyObject* PyUserWidget = nullptr;
-		PyObject* PyBinding = nullptr;
+		const char* UserWidgetNameOrPath = nullptr;
+		const char* SourceExpressionUtf8 = nullptr;
+		const char* TargetObjectNameUtf8 = nullptr;
+		const char* TargetPropertyPathUtf8 = nullptr;
 		PyObject* PyValue = nullptr;
-		if (!PyArg_ParseTuple(Args, "OOO:apply_property_binding", &PyUserWidget, &PyBinding, &PyValue))
+		if (!PyArg_ParseTuple(Args, "ssssO:apply_property_binding", &UserWidgetNameOrPath, &SourceExpressionUtf8, &TargetObjectNameUtf8, &TargetPropertyPathUtf8, &PyValue))
 		{
 			return nullptr;
 		}
 
-		UObject* UserWidgetObject = nullptr;
-		if (!PyConversion::NativizeObject(PyUserWidget, UserWidgetObject, UUserWidget::StaticClass()))
-		{
-			return nullptr;
-		}
+		UUserWidget* UserWidget = FindObject<UUserWidget>(nullptr, UTF8_TO_TCHAR(UserWidgetNameOrPath));
 
 		FWidgetPropertyBinding Binding;
-		if (!PyConversion::Internal::NativizeStructInstance(PyBinding, FWidgetPropertyBinding::StaticStruct(), &Binding, PyConversion::ESetErrorState::Yes))
-		{
-			return nullptr;
-		}
-
-		UUserWidget* UserWidget = Cast<UUserWidget>(UserWidgetObject);
+		Binding.SourceExpression = FString(UTF8_TO_TCHAR(SourceExpressionUtf8));
+		Binding.TargetObjectName = FName(UTF8_TO_TCHAR(TargetObjectNameUtf8));
+		Binding.TargetPropertyPath = FString(UTF8_TO_TCHAR(TargetPropertyPathUtf8));
 		if (!UserWidget || !UserWidget->WidgetTree || !PyValue)
 		{
 			Py_RETURN_NONE;
