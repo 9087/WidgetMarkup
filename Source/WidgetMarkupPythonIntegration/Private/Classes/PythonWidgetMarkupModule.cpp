@@ -5,8 +5,6 @@
 #include "Classes/PythonApplication.h"
 #include "Classes/PythonCore.h"
 #include "Classes/PythonDataBinding.h"
-#include "Classes/PythonInputLibrary.h"
-#include "Classes/PythonKey.h"
 #include "PythonUtilities.h"
 #include "Classes/PythonWidgetLibrary.h"
 #include "WidgetMarkupPythonIntegration.h"
@@ -68,9 +66,7 @@ bool RegisterPythonWidgetMarkupModule()
 		RegisterPythonCoreType(PyModule.Get())
 		&& RegisterPythonDataBindingType(PyModule.Get())
 		&& RegisterPythonWidgetLibraryType(PyModule.Get())
-		&& RegisterPythonApplicationType(PyModule.Get())
-		&& RegisterPythonInputLibraryType(PyModule.Get())
-		&& RegisterPythonKeyType(PyModule.Get());
+		&& RegisterPythonApplicationType(PyModule.Get());
 
 	if (!bRegisteredTypes)
 	{
