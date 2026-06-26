@@ -11,6 +11,7 @@ from widget_markup.WidgetLibrary import WidgetLibrary
 from widget_markup.Application import Application
 
 import sys as _sys
+import unreal
 
 _wm = _sys.modules["_widget_markup"]
 
@@ -19,3 +20,6 @@ _wm.Core = Core
 _wm.DataBinding = DataBinding
 _wm.WidgetLibrary = WidgetLibrary
 _wm.Application = Application
+
+# Re-export UWidgetMarkupInputLibrary as widget_markup.InputLibrary
+_wm.InputLibrary = unreal.WidgetMarkupInputLibrary
