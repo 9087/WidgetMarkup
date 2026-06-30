@@ -1,7 +1,7 @@
 // Copyright 2025 Wu Zhiwei. All Rights Reserved.
 
-#include "Classes/PythonCore.h"
 #include "Classes/PythonWidgetLibrary.h"
+#include "Classes/PythonCore.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"

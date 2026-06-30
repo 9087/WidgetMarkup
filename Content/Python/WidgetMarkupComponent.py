@@ -316,11 +316,20 @@ class WidgetMarkupComponent:
             self.apply_delegate_binding(user_widget, binding)
 
     def apply_delegate_binding(self, user_widget: Any, binding: Any) -> None:
-        target_name = str(binding.target_widget_name)
-        func_name = str(binding.function_name)
-        delegate_name = str(binding.delegate_property_name)
+        self.bind_delegate(
+            str(binding.target_widget_name),
+            str(binding.function_name),
+            str(binding.delegate_property_name),
+        )
 
-        # Use C++ helper to bypass protected WidgetTree access in Python.
+    def bind_delegate(self, target_name: str, func_name: str, delegate_name: str) -> None:
+        """Bind a Python method to a named delegate on a widget.
+
+        Args:
+            target_name: Widget name in the WidgetTree.
+            func_name: Python method name on this component.
+            delegate_name: Delegate property name (e.g. 'OnClicked', 'OnMouseButtonDownEvent').
+        """
         target_widget = self.find_widget(target_name)
         if target_widget is None:
             unreal.log_warning(f"WidgetMarkup: widget '{target_name}' not found in WidgetTree")
@@ -332,6 +341,20 @@ class WidgetMarkupComponent:
             python_method = None
         if python_method is None or not callable(python_method):
             unreal.log_warning(f"WidgetMarkup: method '{func_name}' not found on component")
+            return
+
+        # For FOnPointerEvent delegates, wrap the Python method in an adapter
+        # that unpacks payload → (geometry, mouse_event) and writes reply back.
+        if unreal.WidgetMarkupUserWidget.is_on_pointer_event(target_widget, delegate_name):
+            def _pointer_event_adapter(payload):
+                result = python_method(payload.geometry, payload.mouse_event)
+                payload.reply = result
+
+            pointer_delegate = unreal.WidgetMarkupOnPointerEvent()
+            pointer_delegate.bind_callable(_pointer_event_adapter)
+            unreal.WidgetMarkupUserWidget.bind_on_pointer_event(
+                target_widget, delegate_name, pointer_delegate
+            )
             return
 
         # Try C++ name first (OnClicked), then snake_case fallback (on_clicked),

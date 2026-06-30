@@ -27,8 +27,5 @@ public class WidgetMarkupPythonIntegration : ModuleRules
 			"Projects",
 			"WidgetMarkup",
 		});
-
-		PrivateIncludePaths.Add(Path.Combine(GetModuleDirectory("PythonScriptPlugin"), "Private"));
-		PrivateIncludePaths.Add(Path.Combine(EngineDirectory, "Plugins", "Experimental", "PythonScriptPlugin", "Source", "PythonScriptPlugin", "Private"));
 	}
 }

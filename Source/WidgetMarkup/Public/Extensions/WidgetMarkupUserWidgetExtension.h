@@ -11,6 +11,7 @@
 class IWidgetMarkupComponent;
 class UUserWidget;
 
+
 UCLASS(Transient)
 class WIDGETMARKUP_API UWidgetMarkupUserWidgetExtension : public UUserWidgetExtension
 {

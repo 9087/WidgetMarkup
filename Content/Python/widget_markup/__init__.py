@@ -5,13 +5,13 @@ This package provides the public widget_markup namespace with classes
 that accept/return UObject instances while delegating PathName strings to C++.
 """
 
-from widget_markup.Core import Core
-from widget_markup.DataBinding import DataBinding
-from widget_markup.WidgetLibrary import WidgetLibrary
-from widget_markup.Application import Application
+from .Core import Core
+from .DataBinding import DataBinding
+from .InputLibrary import InputLibrary
+from .WidgetLibrary import WidgetLibrary
+from .Application import Application
 
 import sys as _sys
-import unreal
 
 _wm = _sys.modules["_widget_markup"]
 
@@ -20,6 +20,3 @@ _wm.Core = Core
 _wm.DataBinding = DataBinding
 _wm.WidgetLibrary = WidgetLibrary
 _wm.Application = Application
-
-# Re-export UWidgetMarkupInputLibrary as widget_markup.InputLibrary
-_wm.InputLibrary = unreal.WidgetMarkupInputLibrary
