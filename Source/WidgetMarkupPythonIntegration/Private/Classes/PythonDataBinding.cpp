@@ -19,6 +19,53 @@
 
 namespace
 {
+	/** Build a list of candidate Python attribute names for a C++ struct field.
+	 *  UE uses PascalCase but Python wrappers may use camelCase or snake_case.
+	 *  e.g. "SpecifiedColor" -> ["SpecifiedColor", "specifiedColor", "specified_color"]
+	 */
+	TArray<FString> BuildPythonFieldNameCandidates(const FString& CppFieldName)
+	{
+		TArray<FString> Candidates;
+		Candidates.Reserve(3);
+		Candidates.Add(CppFieldName);
+
+		FString LowerFirst = CppFieldName;
+		if (LowerFirst.Len() > 0 && LowerFirst[0] >= TEXT('A') && LowerFirst[0] <= TEXT('Z'))
+		{
+			LowerFirst[0] += (TEXT('a') - TEXT('A'));
+		}
+		if (LowerFirst != CppFieldName)
+		{
+			Candidates.Add(LowerFirst);
+		}
+
+		FString SnakeCase;
+		for (int32 i = 0; i < CppFieldName.Len(); ++i)
+		{
+			TCHAR Ch = CppFieldName[i];
+			if (Ch >= TEXT('A') && Ch <= TEXT('Z'))
+			{
+				if (i > 0) { SnakeCase.AppendChar(TEXT('_')); }
+				SnakeCase.AppendChar(Ch + (TEXT('a') - TEXT('A')));
+			}
+			else
+			{
+				SnakeCase.AppendChar(Ch);
+			}
+		}
+		if (SnakeCase != CppFieldName && SnakeCase != LowerFirst)
+		{
+			Candidates.Add(SnakeCase);
+		}
+
+		return Candidates;
+	}
+
+	PyObject* TryGetStructField(PyObject* PyStruct, bool bIsDict, const char* Name)
+	{
+		return bIsDict ? PyDict_GetItemString(PyStruct, Name) : PyObject_GetAttrString(PyStruct, Name);
+	}
+
 	bool NativizePythonValueToProperty(PyObject* PyValue, FProperty* Property, void* OutData)
 	{
 		if (!PyValue || !Property || !OutData)
@@ -120,49 +167,19 @@ namespace
 			for (TFieldIterator<FProperty> It(Struct); It; ++It)
 			{
 				FProperty* Field = *It;
-				const FString CppFieldName = Field->GetName();
-
-				// Build fallback name list: [CppName, lowerFirst, snake_case]
-				FString LowerFirst = CppFieldName;
-				if (LowerFirst.Len() > 0 && LowerFirst[0] >= TEXT('A') && LowerFirst[0] <= TEXT('Z'))
-				{
-					LowerFirst[0] = LowerFirst[0] + (TEXT('a') - TEXT('A'));
-				}
-				FString SnakeCase;
-				for (int32 i = 0; i < CppFieldName.Len(); ++i)
-				{
-					TCHAR Ch = CppFieldName[i];
-					if (Ch >= TEXT('A') && Ch <= TEXT('Z'))
-					{
-						if (i > 0)
-						{
-							SnakeCase.AppendChar(TEXT('_'));
-						}
-						SnakeCase.AppendChar(Ch + (TEXT('a') - TEXT('A')));
-					}
-					else
-					{
-						SnakeCase.AppendChar(Ch);
-					}
-				}
+				const bool bIsDict = PyDict_Check(PyValue) != 0;
+				const TArray<FString> CandidateNames = BuildPythonFieldNameCandidates(Field->GetName());
 
 				PyObject* PyField = nullptr;
-				if (PyDict_Check(PyValue))
+				for (const FString& Candidate : CandidateNames)
 				{
-					PyField = PyDict_GetItemString(PyValue, TCHAR_TO_UTF8(*CppFieldName));
-					if (!PyField) { PyErr_Clear(); PyField = PyDict_GetItemString(PyValue, TCHAR_TO_UTF8(*LowerFirst)); }
-					if (!PyField) { PyErr_Clear(); PyField = PyDict_GetItemString(PyValue, TCHAR_TO_UTF8(*SnakeCase)); }
-				}
-				else
-				{
-					PyField = PyObject_GetAttrString(PyValue, TCHAR_TO_UTF8(*CppFieldName));
-					if (!PyField) { PyErr_Clear(); PyField = PyObject_GetAttrString(PyValue, TCHAR_TO_UTF8(*LowerFirst)); }
-					if (!PyField) { PyErr_Clear(); PyField = PyObject_GetAttrString(PyValue, TCHAR_TO_UTF8(*SnakeCase)); }
+					PyField = TryGetStructField(PyValue, bIsDict, TCHAR_TO_UTF8(*Candidate));
+					if (PyField) { break; }
+					PyErr_Clear();
 				}
 
 				if (!PyField)
 				{
-					PyErr_Clear();
 					continue;
 				}
 
