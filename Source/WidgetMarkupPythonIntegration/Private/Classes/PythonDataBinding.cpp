@@ -19,53 +19,6 @@
 
 namespace
 {
-	/** Build a list of candidate Python attribute names for a C++ struct field.
-	 *  UE uses PascalCase but Python wrappers may use camelCase or snake_case.
-	 *  e.g. "SpecifiedColor" -> ["SpecifiedColor", "specifiedColor", "specified_color"]
-	 */
-	TArray<FString> BuildPythonFieldNameCandidates(const FString& CppFieldName)
-	{
-		TArray<FString> Candidates;
-		Candidates.Reserve(3);
-		Candidates.Add(CppFieldName);
-
-		FString LowerFirst = CppFieldName;
-		if (LowerFirst.Len() > 0 && LowerFirst[0] >= TEXT('A') && LowerFirst[0] <= TEXT('Z'))
-		{
-			LowerFirst[0] += (TEXT('a') - TEXT('A'));
-		}
-		if (LowerFirst != CppFieldName)
-		{
-			Candidates.Add(LowerFirst);
-		}
-
-		FString SnakeCase;
-		for (int32 i = 0; i < CppFieldName.Len(); ++i)
-		{
-			TCHAR Ch = CppFieldName[i];
-			if (Ch >= TEXT('A') && Ch <= TEXT('Z'))
-			{
-				if (i > 0) { SnakeCase.AppendChar(TEXT('_')); }
-				SnakeCase.AppendChar(Ch + (TEXT('a') - TEXT('A')));
-			}
-			else
-			{
-				SnakeCase.AppendChar(Ch);
-			}
-		}
-		if (SnakeCase != CppFieldName && SnakeCase != LowerFirst)
-		{
-			Candidates.Add(SnakeCase);
-		}
-
-		return Candidates;
-	}
-
-	PyObject* TryGetStructField(PyObject* PyStruct, bool bIsDict, const char* Name)
-	{
-		return bIsDict ? PyDict_GetItemString(PyStruct, Name) : PyObject_GetAttrString(PyStruct, Name);
-	}
-
 	bool NativizePythonValueToProperty(PyObject* PyValue, FProperty* Property, void* OutData)
 	{
 		if (!PyValue || !Property || !OutData)
@@ -154,6 +107,61 @@ namespace
 			static_cast<FNameProperty*>(Property)->SetPropertyValue(OutData, Value);
 			return true;
 		}
+		if (CastField<FByteProperty>(Property))
+		{
+			FByteProperty* ByteProp = static_cast<FByteProperty*>(Property);
+			if (PyLong_Check(PyValue))
+			{
+				const long Val = PyLong_AsLong(PyValue);
+				if (PyErr_Occurred()) { PyErr_Clear(); return false; }
+				ByteProp->SetPropertyValue(OutData, static_cast<uint8>(Val));
+				return true;
+			}
+			if (PyUnicode_Check(PyValue))
+			{
+				const char* Utf8 = PyUnicode_AsUTF8(PyValue);
+				if (!Utf8) return false;
+				FString EnumName(UTF8_TO_TCHAR(Utf8));
+				if (UEnum* Enum = ByteProp->Enum)
+				{
+					const int64 EnumValue = Enum->GetValueByNameString(EnumName);
+					if (EnumValue != INDEX_NONE)
+					{
+						ByteProp->SetPropertyValue(OutData, static_cast<uint8>(EnumValue));
+						return true;
+					}
+				}
+				return false;
+			}
+			return false;
+		}
+		if (CastField<FEnumProperty>(Property))
+		{
+			FEnumProperty* EnumProp = static_cast<FEnumProperty*>(Property);
+			FNumericProperty* UnderlyingProp = EnumProp->GetUnderlyingProperty();
+			if (!UnderlyingProp) return false;
+			UEnum* Enum = EnumProp->GetEnum();
+			if (PyLong_Check(PyValue))
+			{
+				const long Val = PyLong_AsLong(PyValue);
+				if (PyErr_Occurred()) { PyErr_Clear(); return false; }
+				UnderlyingProp->SetIntPropertyValue(OutData, static_cast<uint64>(Val));
+				return true;
+			}
+			if (PyUnicode_Check(PyValue) && Enum)
+			{
+				const char* Utf8 = PyUnicode_AsUTF8(PyValue);
+				if (!Utf8) return false;
+				const int64 EnumValue = Enum->GetValueByNameString(FString(UTF8_TO_TCHAR(Utf8)));
+				if (EnumValue != INDEX_NONE)
+				{
+					UnderlyingProp->SetIntPropertyValue(OutData, static_cast<uint64>(EnumValue));
+					return true;
+				}
+				return false;
+			}
+			return false;
+		}
 		if (FStructProperty* StructProperty = CastField<FStructProperty>(Property))
 		{
 			// Recursively fill struct fields from Python dict or object attributes.
@@ -168,18 +176,56 @@ namespace
 			{
 				FProperty* Field = *It;
 				const bool bIsDict = PyDict_Check(PyValue) != 0;
-				const TArray<FString> CandidateNames = BuildPythonFieldNameCandidates(Field->GetName());
 
-				PyObject* PyField = nullptr;
-				for (const FString& Candidate : CandidateNames)
+				auto TryField = [&](const FString& Name) -> PyObject*
 				{
-					PyField = TryGetStructField(PyValue, bIsDict, TCHAR_TO_UTF8(*Candidate));
-					if (PyField) { break; }
+					return bIsDict ? PyDict_GetItemString(PyValue, TCHAR_TO_UTF8(*Name))
+					               : PyObject_GetAttrString(PyValue, TCHAR_TO_UTF8(*Name));
+				};
+
+				// 1) C++ name (PascalCase)
+				PyObject* PyField = TryField(Field->GetName());
+
+				// 2) lowercase first character (e.g. "R" -> "r", "SpecifiedColor" -> "specifiedColor")
+				if (!PyField)
+				{
 					PyErr_Clear();
+					FString LowerFirst = Field->GetName();
+					if (LowerFirst.Len() > 0 && LowerFirst[0] >= TEXT('A') && LowerFirst[0] <= TEXT('Z'))
+					{
+						LowerFirst[0] += (TEXT('a') - TEXT('A'));
+					}
+					if (LowerFirst != Field->GetName())
+					{
+						PyField = TryField(LowerFirst);
+					}
+				}
+
+				// 3) snake_case (e.g. "SpecifiedColor" -> "specified_color")
+				if (!PyField)
+				{
+					PyErr_Clear();
+					FString SnakeCase;
+					const FString& CppName = Field->GetName();
+					for (int32 i = 0; i < CppName.Len(); ++i)
+					{
+						TCHAR Ch = CppName[i];
+						if (Ch >= TEXT('A') && Ch <= TEXT('Z'))
+						{
+							if (i > 0) { SnakeCase.AppendChar(TEXT('_')); }
+							SnakeCase.AppendChar(Ch + (TEXT('a') - TEXT('A')));
+						}
+						else { SnakeCase.AppendChar(Ch); }
+					}
+					if (SnakeCase != Field->GetName())
+					{
+						PyField = TryField(SnakeCase);
+					}
 				}
 
 				if (!PyField)
 				{
+					PyErr_Clear();
 					continue;
 				}
 
