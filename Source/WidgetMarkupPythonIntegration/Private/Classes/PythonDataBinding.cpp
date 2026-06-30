@@ -110,17 +110,55 @@ namespace
 		if (FStructProperty* StructProperty = CastField<FStructProperty>(Property))
 		{
 			// Recursively fill struct fields from Python dict or object attributes.
+			// UE struct field names are PascalCase (R,G,B,A, SpecifiedColor) but
+			// Python wrappers may expose them as lowercase (r,g,b,a) or snake_case
+			// (specified_color). Try C++ name first, then lowercase-first-char,
+			// then snake_case fallback.
 			UScriptStruct* Struct = StructProperty->Struct;
 			Struct->InitializeStruct(OutData);
 
 			for (TFieldIterator<FProperty> It(Struct); It; ++It)
 			{
 				FProperty* Field = *It;
-				const char* FieldName = TCHAR_TO_UTF8(*Field->GetName());
+				const FString CppFieldName = Field->GetName();
 
-				PyObject* PyField = PyDict_Check(PyValue)
-					? PyDict_GetItemString(PyValue, FieldName)       // dict: key lookup
-					: PyObject_GetAttrString(PyValue, FieldName);    // object: getattr
+				// Build fallback name list: [CppName, lowerFirst, snake_case]
+				FString LowerFirst = CppFieldName;
+				if (LowerFirst.Len() > 0 && LowerFirst[0] >= TEXT('A') && LowerFirst[0] <= TEXT('Z'))
+				{
+					LowerFirst[0] = LowerFirst[0] + (TEXT('a') - TEXT('A'));
+				}
+				FString SnakeCase;
+				for (int32 i = 0; i < CppFieldName.Len(); ++i)
+				{
+					TCHAR Ch = CppFieldName[i];
+					if (Ch >= TEXT('A') && Ch <= TEXT('Z'))
+					{
+						if (i > 0)
+						{
+							SnakeCase.AppendChar(TEXT('_'));
+						}
+						SnakeCase.AppendChar(Ch + (TEXT('a') - TEXT('A')));
+					}
+					else
+					{
+						SnakeCase.AppendChar(Ch);
+					}
+				}
+
+				PyObject* PyField = nullptr;
+				if (PyDict_Check(PyValue))
+				{
+					PyField = PyDict_GetItemString(PyValue, TCHAR_TO_UTF8(*CppFieldName));
+					if (!PyField) { PyErr_Clear(); PyField = PyDict_GetItemString(PyValue, TCHAR_TO_UTF8(*LowerFirst)); }
+					if (!PyField) { PyErr_Clear(); PyField = PyDict_GetItemString(PyValue, TCHAR_TO_UTF8(*SnakeCase)); }
+				}
+				else
+				{
+					PyField = PyObject_GetAttrString(PyValue, TCHAR_TO_UTF8(*CppFieldName));
+					if (!PyField) { PyErr_Clear(); PyField = PyObject_GetAttrString(PyValue, TCHAR_TO_UTF8(*LowerFirst)); }
+					if (!PyField) { PyErr_Clear(); PyField = PyObject_GetAttrString(PyValue, TCHAR_TO_UTF8(*SnakeCase)); }
+				}
 
 				if (!PyField)
 				{
