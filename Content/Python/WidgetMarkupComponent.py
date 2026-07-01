@@ -318,29 +318,31 @@ class WidgetMarkupComponent:
     def apply_delegate_binding(self, user_widget: Any, binding: Any) -> None:
         self.bind_delegate(
             str(binding.target_widget_name),
-            str(binding.function_name),
             str(binding.delegate_property_name),
+            str(binding.function_name),
         )
 
-    def bind_delegate(self, target_name: str, func_name: str, delegate_name: str) -> None:
-        """Bind a Python method to a named delegate on a widget.
+    def bind_delegate(self, target: str | Any, delegate_name: str, function: str | Callable[..., Any]) -> None:
+        """Bind a callable to a named delegate on a widget.
 
         Args:
-            target_name: Widget name in the WidgetTree.
-            func_name: Python method name on this component.
+            target: Widget name (str) or UWidget instance.
             delegate_name: Delegate property name (e.g. 'OnClicked', 'OnMouseButtonDownEvent').
+            function: Python method name on this component (str), or an arbitrary callable.
         """
-        target_widget = self.find_widget(target_name)
+        if isinstance(target, str):
+            target_widget = self.find_widget(target)
+            target_name = target
+        else:
+            target_name = str(getattr(target, 'get_name', lambda: '')())
+            target_widget = self.find_widget(target_name)
         if target_widget is None:
             unreal.log_warning(f"WidgetMarkup: widget '{target_name}' not found in WidgetTree")
             return
 
-        try:
-            python_method = getattr(self, func_name)
-        except AttributeError:
-            python_method = None
+        python_method = function if callable(function) else getattr(self, function, None)
         if python_method is None or not callable(python_method):
-            unreal.log_warning(f"WidgetMarkup: method '{func_name}' not found on component")
+            unreal.log_warning(f"WidgetMarkup: method '{function}' not found on component")
             return
 
         # For FOnPointerEvent delegates, wrap the Python method in an adapter
