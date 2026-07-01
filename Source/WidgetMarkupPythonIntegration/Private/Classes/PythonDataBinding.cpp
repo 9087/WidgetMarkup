@@ -110,55 +110,75 @@ namespace
 		if (CastField<FByteProperty>(Property))
 		{
 			FByteProperty* ByteProp = static_cast<FByteProperty*>(Property);
-			if (PyLong_Check(PyValue))
+			// UE Python enum wrappers expose underlying int via get_editor_property("value__").
+			PyObject* PyIntValue = PyObject_CallMethod(PyValue, "get_editor_property", "s", "value__");
+			if (!PyIntValue) { PyErr_Clear(); PyIntValue = PyObject_GetAttrString(PyValue, "value"); }
+			if (!PyIntValue || !PyLong_Check(PyIntValue))
 			{
-				const long Val = PyLong_AsLong(PyValue);
-				if (PyErr_Occurred()) { PyErr_Clear(); return false; }
-				ByteProp->SetPropertyValue(OutData, static_cast<uint8>(Val));
-				return true;
-			}
-			if (PyUnicode_Check(PyValue))
-			{
-				const char* Utf8 = PyUnicode_AsUTF8(PyValue);
-				if (!Utf8) return false;
-				FString EnumName(UTF8_TO_TCHAR(Utf8));
-				if (UEnum* Enum = ByteProp->Enum)
+				Py_XDECREF(PyIntValue);
+				PyErr_Clear();
+				// Fallback: enum name string
+				if (PyUnicode_Check(PyValue))
 				{
-					const int64 EnumValue = Enum->GetValueByNameString(EnumName);
-					if (EnumValue != INDEX_NONE)
+					const char* Utf8 = PyUnicode_AsUTF8(PyValue);
+					if (Utf8 && ByteProp->Enum)
 					{
-						ByteProp->SetPropertyValue(OutData, static_cast<uint8>(EnumValue));
-						return true;
+						const int64 EnumValue = ByteProp->Enum->GetValueByNameString(FString(UTF8_TO_TCHAR(Utf8)));
+						if (EnumValue != INDEX_NONE)
+						{
+							ByteProp->SetPropertyValue(OutData, static_cast<uint8>(EnumValue));
+							return true;
+						}
 					}
 				}
 				return false;
 			}
-			return false;
+			const long Val = PyLong_AsLong(PyIntValue);
+			Py_DECREF(PyIntValue);
+			if (PyErr_Occurred()) { PyErr_Clear(); return false; }
+			ByteProp->SetPropertyValue(OutData, static_cast<uint8>(Val));
+			return true;
 		}
 		if (CastField<FEnumProperty>(Property))
 		{
 			FEnumProperty* EnumProp = static_cast<FEnumProperty*>(Property);
 			FNumericProperty* UnderlyingProp = EnumProp->GetUnderlyingProperty();
 			if (!UnderlyingProp) return false;
-			UEnum* Enum = EnumProp->GetEnum();
-			if (PyLong_Check(PyValue))
+
+			// UE Python enum wrappers expose underlying int via get_editor_property("value__").
+			PyObject* PyIntValue = PyObject_CallMethod(PyValue, "get_editor_property", "s", "value__");
+			if (!PyIntValue) { PyErr_Clear(); PyIntValue = PyObject_GetAttrString(PyValue, "value"); }
+			if (!PyIntValue) { PyErr_Clear(); PyIntValue = PyObject_CallMethod(PyValue, "__index__", nullptr); }
+			if (PyIntValue && PyLong_Check(PyIntValue))
 			{
-				const long Val = PyLong_AsLong(PyValue);
-				if (PyErr_Occurred()) { PyErr_Clear(); return false; }
-				UnderlyingProp->SetIntPropertyValue(OutData, static_cast<uint64>(Val));
-				return true;
-			}
-			if (PyUnicode_Check(PyValue) && Enum)
-			{
-				const char* Utf8 = PyUnicode_AsUTF8(PyValue);
-				if (!Utf8) return false;
-				const int64 EnumValue = Enum->GetValueByNameString(FString(UTF8_TO_TCHAR(Utf8)));
-				if (EnumValue != INDEX_NONE)
+				const long Val = PyLong_AsLong(PyIntValue);
+				if (!PyErr_Occurred())
 				{
-					UnderlyingProp->SetIntPropertyValue(OutData, static_cast<uint64>(EnumValue));
+					UnderlyingProp->SetIntPropertyValue(OutData, static_cast<uint64>(Val));
+					Py_DECREF(PyIntValue);
 					return true;
 				}
-				return false;
+				PyErr_Clear();
+			}
+			Py_XDECREF(PyIntValue);
+
+			// Fallback: enum name string
+			if (PyUnicode_Check(PyValue))
+			{
+				const char* Utf8 = PyUnicode_AsUTF8(PyValue);
+				if (Utf8)
+				{
+					UEnum* Enum = EnumProp->GetEnum();
+					if (Enum)
+					{
+						const int64 EnumValue = Enum->GetValueByNameString(FString(UTF8_TO_TCHAR(Utf8)));
+						if (EnumValue != INDEX_NONE)
+						{
+							UnderlyingProp->SetIntPropertyValue(OutData, static_cast<uint64>(EnumValue));
+							return true;
+						}
+					}
+				}
 			}
 			return false;
 		}
@@ -177,50 +197,19 @@ namespace
 				FProperty* Field = *It;
 				const bool bIsDict = PyDict_Check(PyValue) != 0;
 
-				auto TryField = [&](const FString& Name) -> PyObject*
+				PyObject* PyField = nullptr;
+				if (bIsDict)
 				{
-					return bIsDict ? PyDict_GetItemString(PyValue, TCHAR_TO_UTF8(*Name))
-					               : PyObject_GetAttrString(PyValue, TCHAR_TO_UTF8(*Name));
-				};
-
-				// 1) C++ name (PascalCase)
-				PyObject* PyField = TryField(Field->GetName());
-
-				// 2) lowercase first character (e.g. "R" -> "r", "SpecifiedColor" -> "specifiedColor")
-				if (!PyField)
-				{
-					PyErr_Clear();
-					FString LowerFirst = Field->GetName();
-					if (LowerFirst.Len() > 0 && LowerFirst[0] >= TEXT('A') && LowerFirst[0] <= TEXT('Z'))
-					{
-						LowerFirst[0] += (TEXT('a') - TEXT('A'));
-					}
-					if (LowerFirst != Field->GetName())
-					{
-						PyField = TryField(LowerFirst);
-					}
+					// Dict: try C++ name directly
+					FTCHARToUTF8 NameUtf8(*Field->GetName());
+					PyField = PyDict_GetItemString(PyValue, NameUtf8.Get());
 				}
-
-				// 3) snake_case (e.g. "SpecifiedColor" -> "specified_color")
-				if (!PyField)
+				else
 				{
-					PyErr_Clear();
-					FString SnakeCase;
-					const FString& CppName = Field->GetName();
-					for (int32 i = 0; i < CppName.Len(); ++i)
-					{
-						TCHAR Ch = CppName[i];
-						if (Ch >= TEXT('A') && Ch <= TEXT('Z'))
-						{
-							if (i > 0) { SnakeCase.AppendChar(TEXT('_')); }
-							SnakeCase.AppendChar(Ch + (TEXT('a') - TEXT('A')));
-						}
-						else { SnakeCase.AppendChar(Ch); }
-					}
-					if (SnakeCase != Field->GetName())
-					{
-						PyField = TryField(SnakeCase);
-					}
+					// UE Python struct wrapper: use get_editor_property with C++ field name.
+					// This is the canonical way to access UE struct fields from Python.
+					FTCHARToUTF8 NameUtf8(*Field->GetName());
+					PyField = PyObject_CallMethod(PyValue, "get_editor_property", "s", NameUtf8.Get());
 				}
 
 				if (!PyField)

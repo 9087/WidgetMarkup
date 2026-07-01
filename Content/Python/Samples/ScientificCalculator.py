@@ -42,14 +42,14 @@ class ScientificCalculator(WidgetMarkupComponent):
     @computed
     def second_button_color(self):
         if self.second_active:
-            return {"R": 0.55, "G": 0.55, "B": 0.55, "A": 1.0}
-        return {"R": 0.97, "G": 0.97, "B": 0.95, "A": 1.0}
+            return unreal.LinearColor(0.55, 0.55, 0.55, 1.0)
+        return unreal.LinearColor(0.97, 0.97, 0.95, 1.0)
 
     @computed
     def second_button_text_color(self):
         if self.second_active:
-            return {"SpecifiedColor": {"R": 1.0, "G": 1.0, "B": 1.0, "A": 1.0}, "ColorUseRule": 0}
-        return {"SpecifiedColor": {"R": 0.22, "G": 0.22, "B": 0.22, "A": 1.0}, "ColorUseRule": 0}
+            return unreal.SlateColor(unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
+        return unreal.SlateColor(unreal.LinearColor(0.22, 0.22, 0.22, 1.0))
 
     def __init__(self) -> None:
         super().__init__()
