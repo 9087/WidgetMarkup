@@ -69,8 +69,15 @@ FElementNode::FResult FBlueprintElementNode::OnEnd()
 		return FResult::Failure().Error(FText::FromString(TEXT("BlueprintElementNode: failed to cast stored object to UBlueprint before compile.")));
 	}
 
+	// Skip garbage collection during blueprint compilation.
+	// Without this, FKismetEditorUtilities::CompileBlueprint may trigger GC on
+	// background worker threads (via FRealtimeGC or FReferencerFinder). When
+	// Python wrappers exist (e.g. for a WidgetMarkup script component), those
+	// background threads try to acquire the Python GIL via FPyReferenceCollector,
+	// which is only safe from the game thread. This causes a hang or crash.
+	// See: PyReferenceCollector.cpp in the PythonScriptPlugin.
 	EBlueprintCompileOptions CompileOptions = EBlueprintCompileOptions::None;
-	CompileOptions |= EBlueprintCompileOptions::IncludeCDOInReferenceReplacement;
+	CompileOptions |= EBlueprintCompileOptions::SkipGarbageCollection;
 	FKismetEditorUtilities::CompileBlueprint(Blueprint, CompileOptions);
 	return FResult::Success();
 }
