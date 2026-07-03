@@ -1,22 +1,15 @@
 from __future__ import annotations
 
-import enum
 import random
 
 import unreal
 from WidgetMarkupComponent import WidgetMarkupComponent, computed, reactive
 
-
-class CellState(enum.Enum):
-    HIDDEN = 0
-    FLAGGED = 1
-    REVEALED = 2
+from Samples.MinesweeperCell import CellState, MinesweeperCell
 
 ROWS = 9
 COLS = 9
 MINES = 10
-
-from Samples.MinesweeperCell import MinesweeperCell
 
 
 class Minesweeper(WidgetMarkupComponent):
@@ -70,9 +63,7 @@ class Minesweeper(WidgetMarkupComponent):
                     unreal.log_warning(f"Minesweeper: failed to create {name}")
                     continue
 
-                cell.row = row
-                cell.column = column
-                cell.parent_game = self
+                cell.on_click = lambda geo, evt, r=row, c=column: self._on_cell_clicked(r, c, geo, evt)
                 self._grid[row][column] = cell
 
                 child_widget = self.find_widget(name)
@@ -90,12 +81,12 @@ class Minesweeper(WidgetMarkupComponent):
         unreal.log_warning(f"Minesweeper: created {created}/{ROWS*COLS} cells")
         self._cells_created = True
 
-    def on_cell_mouse_down(
+    def _on_cell_clicked(
         self, row: int, column: int,
         geometry: unreal.Geometry,
         mouse_event: unreal.WidgetMarkupPointerEvent,
     ) -> Any:
-        """Called by CellWidget when a cell border is clicked."""
+        """Handle click on a cell (registered as on_click callback)."""
         if self._is_right_mouse_button(mouse_event):
             self._toggle_flag(self._grid[row][column])
         else:
@@ -245,7 +236,6 @@ class Minesweeper(WidgetMarkupComponent):
                     cell = self._grid[row][column]
                     if cell.is_mine and cell.state != CellState.FLAGGED:
                         cell.state = CellState.FLAGGED
-                        self._refresh_cell(cell)
         else:
             self.status_text = "Game Over"
             for row in range(ROWS):
@@ -253,14 +243,3 @@ class Minesweeper(WidgetMarkupComponent):
                     cell = self._grid[row][column]
                     if cell.is_mine:
                         cell.state = CellState.REVEALED
-                        self._refresh_cell(cell)
-
-    def _refresh_all_cells(self) -> None:
-        for row in range(ROWS):
-            for column in range(COLS):
-                cell = self._grid[row][column]
-                if cell is not None:
-                    cell.refresh()
-
-    def _refresh_cell(self, cell: MinesweeperCell) -> None:
-        cell.refresh()

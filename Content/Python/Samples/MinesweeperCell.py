@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
+
+import enum
 
 import unreal
 from WidgetMarkupComponent import WidgetMarkupComponent, computed, reactive
 
-from Samples.Minesweeper import CellState
+
+class CellState(enum.Enum):
+    HIDDEN = 0
+    FLAGGED = 1
+    REVEALED = 2
 
 _NUMBER_COLORS = {
     1: unreal.LinearColor(0.0, 0.0, 1.0, 1.0),
@@ -56,9 +62,7 @@ class MinesweeperCell(WidgetMarkupComponent):
             return unreal.LinearColor(0.72, 0.72, 0.74, 1.0)
         if self.state == CellState.FLAGGED:
             return unreal.LinearColor(0.95, 0.88, 0.35, 1.0)
-        # Game-over red relies on parent_game.is_game_over which is cross-
-        # instance and not auto-tracked; _end_game calls refresh() for this.
-        if self.is_mine and self.parent_game is not None and self.parent_game.is_game_over:
+        if self.is_mine and self.state == CellState.REVEALED:
             return unreal.LinearColor(0.95, 0.35, 0.35, 1.0)
         return unreal.LinearColor(0.86, 0.86, 0.88, 1.0)
 
@@ -76,27 +80,14 @@ class MinesweeperCell(WidgetMarkupComponent):
     # --- Lifecycle ---
 
     def __init__(self) -> None:
-        self.row: int = -1
-        self.column: int = -1
-        self.parent_game: Any = None  # Minesweeper instance
+        self.on_click: Callable[[unreal.Geometry, unreal.WidgetMarkupPointerEvent], Any] | None = None
         super().__init__()
-
-    # --- Public API ---
-
-    def refresh(self) -> None:
-        """Force recompute of computed properties (for cross-instance deps like game-over)."""
-        # Accessing each computed property triggers recomputation and UI notification.
-        _ = self.label
-        _ = self.background_color
-        _ = self.text_color
 
     # --- Input ---
 
     def on_mouse_down(
         self, geometry: unreal.Geometry, mouse_event: unreal.WidgetMarkupPointerEvent,
     ) -> Any:
-        if self.parent_game is not None:
-            return self.parent_game.on_cell_mouse_down(
-                self.row, self.column, geometry, mouse_event,
-            )
+        if self.on_click is not None:
+            return self.on_click(geometry, mouse_event)
         return unreal.WidgetLibrary.handled()
