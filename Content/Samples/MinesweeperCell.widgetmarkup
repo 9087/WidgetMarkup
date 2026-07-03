@@ -1,0 +1,17 @@
+<WidgetBlueprint Script="Samples.MinesweeperCell">
+  <WidgetTree>
+    <Border Name="CellBorder"
+            BrushColor="{background_color}"
+            HorizontalAlignment="HAlign_Center"
+            VerticalAlignment="VAlign_Center"
+            Padding="4,4,4,4"
+            OnMouseButtonDownEvent="on_mouse_down">
+      <TextBlock Name="CellLabel"
+                 Text="{label}"
+                 Font.Size="16"
+                 Justification="Center"
+                 Visibility="HitTestInvisible"
+                 ColorAndOpacity="{text_color}"/>
+    </Border>
+  </WidgetTree>
+</WidgetBlueprint>

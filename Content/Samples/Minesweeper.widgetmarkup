@@ -1,0 +1,60 @@
+<WidgetBlueprint Script="Samples.Minesweeper">
+  <WidgetTree>
+    <CanvasPanel>
+      <Border BrushColor="0.62,0.62,0.64,1" Padding="12,12,12,12"
+              HorizontalAlignment="HAlign_Fill"
+              VerticalAlignment="VAlign_Fill"
+              Slot.LayoutData.Anchors.Minimum="0,0"
+              Slot.LayoutData.Anchors.Maximum="1,1"
+              Slot.LayoutData.Alignment="0,0"
+              Slot.LayoutData.Offsets="0,0,0,0">
+        <VerticalBox>
+          <HorizontalBox Slot.Padding="0,0,0,8">
+            <Border BrushColor="0.12,0.12,0.14,1" Padding="8,4,8,4"
+                    Slot.Padding="0,0,12,0">
+              <TextBlock Text="{mines_remaining}"
+                         Font.Size="28"
+                         ColorAndOpacity="1,0.15,0.15,1" />
+            </Border>
+            <Button OnClicked="start_new_game"
+                    Slot.Size.SizeRule="Fill"
+                    Slot.Size.Value="1"
+                    Slot.Padding="4,0,4,0">
+              <TextBlock Text=":)" Font.Size="22" />
+            </Button>
+          </HorizontalBox>
+          <TextBlock Text="{status_text}"
+                     Font.Size="18"
+                     Justification="Center"
+                     Slot.Padding="0,0,0,8" />
+          <GridPanel Name="GameGrid"
+                     Slot.Size.SizeRule="Fill"
+                     Slot.Size.Value="1">
+            <ColumnFill>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            </ColumnFill>
+            <RowFill>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            <Float>1</Float>
+            </RowFill>
+          </GridPanel>
+        </VerticalBox>
+      </Border>
+    </CanvasPanel>
+  </WidgetTree>
+</WidgetBlueprint>

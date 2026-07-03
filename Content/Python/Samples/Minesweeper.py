@@ -1,0 +1,266 @@
+from __future__ import annotations
+
+import enum
+import random
+
+import unreal
+from WidgetMarkupComponent import WidgetMarkupComponent, computed, reactive
+
+
+class CellState(enum.Enum):
+    HIDDEN = 0
+    FLAGGED = 1
+    REVEALED = 2
+
+ROWS = 9
+COLS = 9
+MINES = 10
+
+from Samples.MinesweeperCell import MinesweeperCell
+
+
+class Minesweeper(WidgetMarkupComponent):
+    @computed
+    def mines_remaining(self):
+        remaining = max(MINES - self.flag_count, 0)
+        return f"{remaining:03d}"
+
+    @reactive
+    def status_text(self):
+        return "Left click to reveal, right click to flag"
+
+    @reactive
+    def flag_count(self) -> int:
+        return 0
+
+    def __init__(self) -> None:
+        self._grid: list[list[MinesweeperCell]] = []
+        self._cells_created = False
+        self._game_over = False
+        self._won = False
+        self._mines_placed = False
+        super().__init__()
+        self.start_new_game()
+
+    def _ensure_cells(self) -> None:
+        """Create cell widgets if not already created."""
+        if self._cells_created:
+            return
+        self._create_cells()
+
+    def _create_cells(self) -> None:
+        """Dynamically create CellWidget instances and add them to the grid."""
+        game_grid = self.find_widget("GameGrid")
+        if game_grid is None:
+            unreal.log_warning("Minesweeper: GameGrid not found")
+            return
+
+        unreal.log_warning(f"Minesweeper: creating {ROWS}x{COLS} cells...")
+        self._grid = [[None] * COLS for _ in range(ROWS)]
+        created = 0
+        for row in range(ROWS):
+            for column in range(COLS):
+                name = f"Cell_{row}_{column}"
+                try:
+                    cell = self.add_child(name, "/WidgetMarkup/Samples/MinesweeperCell", game_grid)
+                except Exception as exc:
+                    unreal.log_error(f"Minesweeper: add_child failed for {name}: {exc}")
+                    continue
+                if cell is None:
+                    unreal.log_warning(f"Minesweeper: failed to create {name}")
+                    continue
+
+                cell.row = row
+                cell.column = column
+                cell.parent_game = self
+                self._grid[row][column] = cell
+
+                child_widget = self.find_widget(name)
+                if child_widget is not None:
+                    slot = child_widget.slot
+                    if slot is not None:
+                        slot.set_row(row)
+                        slot.set_column(column)
+                        slot.set_padding(unreal.Margin(2.0, 2.0, 2.0, 2.0))
+                        slot.set_horizontal_alignment(unreal.HorizontalAlignment.H_ALIGN_FILL)
+                        slot.set_vertical_alignment(unreal.VerticalAlignment.V_ALIGN_FILL)
+
+                created += 1
+
+        unreal.log_warning(f"Minesweeper: created {created}/{ROWS*COLS} cells")
+        self._cells_created = True
+
+    def on_cell_mouse_down(
+        self, row: int, column: int,
+        geometry: unreal.Geometry,
+        mouse_event: unreal.WidgetMarkupPointerEvent,
+    ) -> Any:
+        """Called by CellWidget when a cell border is clicked."""
+        if self._is_right_mouse_button(mouse_event):
+            self._toggle_flag(self._grid[row][column])
+        else:
+            self.handle_cell_click(row, column)
+        return unreal.WidgetLibrary.handled()
+
+    @staticmethod
+    def _is_right_mouse_button(mouse_event: unreal.WidgetMarkupPointerEvent) -> bool:
+        key_name = mouse_event.effecting_button.get_editor_property("key_name")
+        return "RightMouseButton" in str(key_name)
+
+    @property
+    def is_game_over(self) -> bool:
+        return self._game_over
+
+    def start_new_game(self) -> None:
+        unreal.log_warning("Minesweeper: start_new_game called")
+        self._ensure_cells()
+
+        for row in range(ROWS):
+            for column in range(COLS):
+                cell = self._grid[row][column]
+                if cell is not None:
+                    cell.state = CellState.HIDDEN
+                    cell.is_mine = False
+                    cell.adjacent_mines = 0
+        self._game_over = False
+        self._won = False
+        self._mines_placed = False
+        self.flag_count = 0
+        self.status_text = "Left click to reveal, right click to flag"
+
+    def handle_cell_click(self, row: int, column: int) -> None:
+        if self._game_over or self._won:
+            return
+
+        cell = self._grid[row][column]
+        if cell.state == CellState.FLAGGED:
+            return
+
+        if not self._mines_placed:
+            self._place_mines(row, column)
+            self._mines_placed = True
+
+        if cell.state != CellState.HIDDEN:
+            return
+
+        self._reveal_cell(row, column)
+        if cell.is_mine:
+            self._end_game(won=False)
+            return
+
+        if self._check_win():
+            self._end_game(won=True)
+
+    def _toggle_flag(self, cell: MinesweeperCell) -> None:
+        if self._game_over or self._won:
+            return
+        if cell.state == CellState.REVEALED:
+            return
+
+        if cell.state == CellState.FLAGGED:
+            cell.state = CellState.HIDDEN
+            self.flag_count -= 1
+        else:
+            cell.state = CellState.FLAGGED
+            self.flag_count += 1
+
+    def _place_mines(self, safe_row: int, safe_column: int) -> None:
+        safe_cells = {(safe_row, safe_column)}
+        for delta_row in (-1, 0, 1):
+            for delta_column in (-1, 0, 1):
+                neighbor_row = safe_row + delta_row
+                neighbor_column = safe_column + delta_column
+                if 0 <= neighbor_row < ROWS and 0 <= neighbor_column < COLS:
+                    safe_cells.add((neighbor_row, neighbor_column))
+
+        candidates = [
+            (row, column)
+            for row in range(ROWS)
+            for column in range(COLS)
+            if (row, column) not in safe_cells
+        ]
+        random.shuffle(candidates)
+
+        for row, column in candidates[:MINES]:
+            self._grid[row][column].is_mine = True
+
+        for row in range(ROWS):
+            for column in range(COLS):
+                if self._grid[row][column].is_mine:
+                    continue
+                self._grid[row][column].adjacent_mines = self._count_adjacent_mines(row, column)
+
+    def _count_adjacent_mines(self, row: int, column: int) -> int:
+        count = 0
+        for delta_row in (-1, 0, 1):
+            for delta_column in (-1, 0, 1):
+                if delta_row == 0 and delta_column == 0:
+                    continue
+                neighbor_row = row + delta_row
+                neighbor_column = column + delta_column
+                if 0 <= neighbor_row < ROWS and 0 <= neighbor_column < COLS:
+                    if self._grid[neighbor_row][neighbor_column].is_mine:
+                        count += 1
+        return count
+
+    def _reveal_cell(self, row: int, column: int) -> None:
+        cell = self._grid[row][column]
+        if cell.state == CellState.REVEALED:
+            return
+
+        if cell.state == CellState.FLAGGED:
+            cell.state = CellState.HIDDEN
+            self.flag_count -= 1
+
+        cell.state = CellState.REVEALED
+
+        if not cell.is_mine and cell.adjacent_mines == 0:
+            for delta_row in (-1, 0, 1):
+                for delta_column in (-1, 0, 1):
+                    if delta_row == 0 and delta_column == 0:
+                        continue
+                    neighbor_row = row + delta_row
+                    neighbor_column = column + delta_column
+                    if 0 <= neighbor_row < ROWS and 0 <= neighbor_column < COLS:
+                        neighbor = self._grid[neighbor_row][neighbor_column]
+                        if neighbor.state == CellState.HIDDEN:
+                            self._reveal_cell(neighbor_row, neighbor_column)
+
+    def _check_win(self) -> bool:
+        for row in range(ROWS):
+            for column in range(COLS):
+                cell = self._grid[row][column]
+                if not cell.is_mine and cell.state != CellState.REVEALED:
+                    return False
+        return True
+
+    def _end_game(self, won: bool) -> None:
+        self._won = won
+        self._game_over = not won
+
+        if won:
+            self.status_text = "You Win!"
+            for row in range(ROWS):
+                for column in range(COLS):
+                    cell = self._grid[row][column]
+                    if cell.is_mine and cell.state != CellState.FLAGGED:
+                        cell.state = CellState.FLAGGED
+                        self._refresh_cell(cell)
+        else:
+            self.status_text = "Game Over"
+            for row in range(ROWS):
+                for column in range(COLS):
+                    cell = self._grid[row][column]
+                    if cell.is_mine:
+                        cell.state = CellState.REVEALED
+                        self._refresh_cell(cell)
+
+    def _refresh_all_cells(self) -> None:
+        for row in range(ROWS):
+            for column in range(COLS):
+                cell = self._grid[row][column]
+                if cell is not None:
+                    cell.refresh()
+
+    def _refresh_cell(self, cell: MinesweeperCell) -> None:
+        cell.refresh()
