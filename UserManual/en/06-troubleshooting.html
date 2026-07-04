@@ -68,6 +68,23 @@
         <code>sys.path</code>. Re-enable the plugin and restart the editor.
     </p>
 
+    <h3>&laquo;Blueprint compilation hangs&raquo; (Python components)</h3>
+    <p>
+        Compiling a WidgetMarkup blueprint with <strong>Python
+        components</strong> can trigger UE's background garbage collector
+        (<code>FRealtimeGC</code>) on worker threads. When Python wrappers
+        exist, these threads attempt to acquire the Python GIL via
+        <code>FPyReferenceCollector</code>, which is only safe from the game
+        thread, causing a hang or crash.
+    </p>
+    <p>
+        WidgetMarkup's compiler avoids this with
+        <code>EBlueprintCompileOptions::SkipGarbageCollection</code>. If you
+        add custom compilation logic, do <strong>not</strong> add
+        <code>IncludeCDOInReferenceReplacement</code> or similar
+        GC-triggering options.
+    </p>
+
     <h3>&laquo;Cyclic computed dependency detected&raquo;</h3>
     <p>
         A <code>@computed</code> property reaches itself through its

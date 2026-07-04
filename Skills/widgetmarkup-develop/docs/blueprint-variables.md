@@ -117,3 +117,5 @@ Enums are auto-detected — no prefix needed. The `E` prefix is auto-added.
 | Type | Example |
 |---|---|
 | `ECollisionChannel` | `"ECC_WorldStatic"` |
+
+> **Literal braces in Default:** The `Default` attribute treats `{}` as literal text, not a binding expression. Use normal `"value"` syntax for strings containing braces — the binding-expression detection is suppressed for `<Variable Default="...">`.

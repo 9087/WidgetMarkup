@@ -231,7 +231,9 @@ Literal (non-binding) values are converted by UE's property system:
 
 ## 4. Python & ListView
 
-See [docs/python-components.md](docs/python-components.md) for the complete Python component development guide and ListView setup.
+See [docs/python-components.md](docs/python-components.md) for the complete Python component development guide, design principles, and ListView setup.
+
+> **Design principles:** Prefer data binding (`@reactive`/`@computed`) and event binding (`OnClicked`/`OnMouseButtonDownEvent`) over manual widget manipulation. Minimize coupling between WidgetMarkupComponents — use `@computed` (local derivation) and callback registration instead of reaching into parent/child internals. See [Design Principles](docs/python-components.md#design-principles) for details.
 
 > **WidgetMarkup `unreal` API:** Python runs in WidgetMarkup, not the full Editor. Use native **`unreal`** by default; check **`widget_markup`** only for APIs listed in [unreal-python-api.md](docs/unreal-python-api.md). Library names follow UE `ScriptName` (`unreal.WidgetLibrary`, not `WidgetBlueprintLibrary`). For `PointerEvent` in widget delegates, prefer `widget_markup.InputLibrary`.
 
@@ -427,4 +429,8 @@ Sample `.widgetmarkup` blueprints and Python components are in the plugin direct
 Game/Plugins/WidgetMarkup/Content/Samples/
 ```
 
-Includes: Counter (increment/decrement), ListView with color-cycled entries, and more. See the samples for complete working examples of all concepts covered in this document.
+Includes: **ScientificCalculator** (reactive/computed properties with style sheets) and **Minesweeper** (dynamic cell creation with `add_child`, callback event routing, and `@computed` auto-tracking). See the samples for complete working examples of all concepts covered in this document.
+
+## 8. Blueprint Compilation Caveat
+
+Blueprint compilation with Python components can trigger UE's background garbage collector (`FRealtimeGC`) on worker threads. When Python wrappers exist, these background threads may try to acquire the Python GIL via `FPyReferenceCollector`, causing a hang or crash. WidgetMarkup's compiler uses `EBlueprintCompileOptions::SkipGarbageCollection` to avoid this — do NOT add `IncludeCDOInReferenceReplacement` or other GC-triggering options to compile flags in `BlueprintElementNode.cpp`.

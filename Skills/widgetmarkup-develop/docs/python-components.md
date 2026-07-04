@@ -2,6 +2,21 @@
 
 > **WidgetMarkupApp `unreal` API:** See [unreal-python-api.md](unreal-python-api.md) for `ScriptName` mappings (`InputLibrary`, `WidgetLibrary`), `PointerEvent` / mouse-button handling, and common pitfalls.
 
+## Design Principles
+
+**Prefer declarations over imperative code.** The framework's three declarative mechanisms should be your first choice:
+
+| Priority | Mechanism | When |
+|---|---|---|
+| 1 | **Data binding** (`{reactive}` / `{computed}`) | Push data from Python to widget properties |
+| 2 | **Event binding** (`OnClicked="handler"`) | React to user input on widgets |
+| 3 | Manual `find_widget` + setter | Only when binding cannot express the behavior |
+
+**Minimize coupling between WidgetMarkupComponents.** Each component should be self-contained:
+- Use `@computed` to derive visuals from local `@reactive` state — don't reach into parent components.
+- Use **callback registration** (e.g., `cell.on_click = lambda ...`) instead of children calling parent methods directly.
+- Cross-instance dependencies are NOT auto-tracked by the reactive system. If unavoidable, keep them explicit and minimal.
+
 ## Basic Component
 
 ```python
@@ -395,3 +410,60 @@ The same `TestChild` can also serve as a ListView entry widget:
 ```
 
 A reusable child widget should not call `request_shutdown()` — that is the responsibility of the root test component only.
+
+## Dynamic Event Routing
+
+When creating child widgets dynamically via `add_child`, route events back to the parent using **callback registration** rather than directly calling parent methods:
+
+```python
+# Cell component — exposes a click callback:
+class MinesweeperCell(WidgetMarkupComponent):
+    def __init__(self):
+        self.on_click: Callable[[unreal.Geometry, unreal.PointerEvent], Any] | None = None
+        super().__init__()
+
+    def on_mouse_down(self, geometry, mouse_event):
+        if self.on_click is not None:
+            return self.on_click(geometry, mouse_event)
+        return unreal.WidgetLibrary.handled()
+
+# Parent component — registers callback per cell:
+def _create_cells(self):
+    for row, col in ...:
+        cell = self.add_child(f"Cell_{row}_{col}", "/WidgetMarkup/Samples/MinesweeperCell", game_grid)
+        cell.on_click = lambda geo, evt, r=row, c=col: self._on_cell_clicked(r, c, geo, evt)
+```
+
+This pattern keeps the child component **decoupled** from the parent — the child only needs a public callback attribute, not knowledge of the parent's API. Use `lambda` default-argument binding (`r=row, c=col`) to capture loop variables correctly.
+
+## Computed Property Auto-Tracking
+
+`@computed` automatically discovers dependencies by tracking which `@reactive` or `@computed` properties are read during evaluation:
+
+```python
+@reactive
+def state(self) -> CellState:
+    return CellState.HIDDEN
+
+@reactive
+def is_mine(self) -> bool:
+    return False
+
+@computed
+def label(self) -> str:
+    if self.state == CellState.FLAGGED:   # reads state → tracked
+        return "F"
+    if self.is_mine:                       # reads is_mine → tracked
+        return "*"
+    return ""
+```
+
+When `self.state = CellState.REVEALED` is assigned:
+1. `_ReactiveProperty.__set__` stores the new value
+2. `_propagate` finds all `@computed` properties that read `state` → marks them dirty
+3. Each dirty computed property recomputes and fires `on_property_changed`
+4. UI bindings update automatically
+
+**Cross-instance dependencies are NOT tracked.** Computed properties can only auto-track reactive properties on the same component instance. For cross-instance changes (e.g., a parent's game-over state affecting child visuals), you must call the child's methods manually.
+
+> **Minesweeper sample:** See `Content/Samples/Minesweeper.widgetmarkup` and `Content/Python/Samples/Minesweeper.py` for a complete example combining `add_child`, `on_click` callback registration, and `@computed` auto-tracking.

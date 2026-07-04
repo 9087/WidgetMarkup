@@ -1,35 +1,158 @@
 ﻿<!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>06 · 排错与参考 — WidgetMarkup</title>
+<title>06 &middot; Troubleshooting and Reference &mdash; WidgetMarkup</title>
 <link rel="stylesheet" href="../assets/styles.css">
 </head>
 <body>
 <div id="manual-header"></div>
 <main class="container">
-    <h1>6. 排错与参考</h1>
-    <p class="lead">常用命令、常见错误与源码定位入口。</p>
-    <h2>6.1 编辑器命令</h2>
-    <pre><code>WidgetMarkup.Show &lt;PackagePath&gt;
-WidgetMarkup.Compile &lt;Name&gt; &lt;XML&gt;
-WidgetMarkup.GenerateIntellisenseData &lt;OutputPath&gt;</code></pre>
-    <h2>6.2 常见错误</h2>
+    <h1>6. Troubleshooting and Reference</h1>
+    <p class="lead">
+        Editor commands, common error messages, and pointers to the source
+        code if you need to dig deeper.
+    </p>
+
+    <h2>6.1 Editor commands</h2>
+    <table>
+        <thead>
+            <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>WidgetMarkup.Show &lt;PackagePath&gt;</code></td>
+                <td>Compile the source file at the given <code>/Game/...</code> path and open the preview window. The file is then watched for changes.</td>
+            </tr>
+            <tr>
+                <td><code>WidgetMarkup.Compile &lt;Name&gt; &lt;XML&gt;</code></td>
+                <td>Low-level helper that compiles XML directly from a string. Mostly useful for scripted tests.</td>
+            </tr>
+            <tr>
+                <td><code>WidgetMarkup.GenerateIntellisenseData &lt;OutputPath&gt;</code></td>
+                <td>Export UMG type metadata as JSON for use by the VS Code extension.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>6.2 Common errors</h2>
+
+    <h3>&laquo;Failed to resolve type&raquo;</h3>
+    <p>
+        Reported by <code>FTypeParser</code> when a class, struct or enum
+        name in a <code>Variable Type=&quot;...&quot;</code>,
+        <code>Super</code> or <code>Implements</code> attribute cannot be
+        found. Use the short class name (no <code>U</code>/<code>F</code>
+        prefix) and verify the asset/module is loaded.
+    </p>
+
+    <h3>&laquo;Container nesting is not supported: 'Array&lt;Array&lt;Int&gt;&gt;'&raquo;</h3>
+    <p>
+        Container types such as <code>Array</code>, <code>Set</code> and
+        <code>Map</code> can only wrap a non-container element type. Replace
+        the inner container with a struct or a custom type.
+    </p>
+
+    <h3>&laquo;Script property target is not a WidgetBlueprint&raquo;</h3>
+    <p>
+        The <code>Script</code> attribute is registered for
+        <code>UWidgetBlueprint</code>. It only makes sense on the root
+        <code>&lt;WidgetBlueprint&gt;</code> element.
+    </p>
+
+    <h3>&laquo;Failed to import component base module 'WidgetMarkupComponent'&raquo;</h3>
+    <p>
+        Either the <strong>WidgetMarkupPythonIntegration</strong> plugin is
+        disabled, or its <code>Content/Python</code> directory is not on
+        <code>sys.path</code>. Re-enable the plugin and restart the editor.
+    </p>
+
+    <h3>&laquo;Blueprint compilation hangs&raquo; (Python components)</h3>
+    <p>
+        Compiling a WidgetMarkup blueprint with <strong>Python
+        components</strong> can trigger UE's background garbage collector
+        (<code>FRealtimeGC</code>) on worker threads. When Python wrappers
+        exist, these threads attempt to acquire the Python GIL via
+        <code>FPyReferenceCollector</code>, which is only safe from the game
+        thread, causing a hang or crash.
+    </p>
+    <p>
+        WidgetMarkup's compiler avoids this with
+        <code>EBlueprintCompileOptions::SkipGarbageCollection</code>. If you
+        add custom compilation logic, do <strong>not</strong> add
+        <code>IncludeCDOInReferenceReplacement</code> or similar
+        GC-triggering options.
+    </p>
+
+    <h3>&laquo;Cyclic computed dependency detected&raquo;</h3>
+    <p>
+        A <code>@computed</code> property reaches itself through its
+        dependencies. Refactor so that the cycle is broken &mdash; usually by
+        promoting one node to a <code>@reactive</code> property and
+        assigning to it explicitly.
+    </p>
+
+    <h2>6.3 Logs</h2>
     <ul>
-        <li>Unresolved Type：类型名无法解析。</li>
-        <li>Container nesting is not supported：不支持容器嵌套。</li>
-        <li>Script property target is not a WidgetBlueprint：Script 只应写在 WidgetBlueprint 根节点。</li>
+        <li><code>LogWidgetMarkup</code> &mdash; markup compilation, property
+            resolution, style sheet application.</li>
+        <li><code>LogWidgetMarkupPythonIntegration</code> &mdash; Python
+            availability, module import errors, lifecycle.</li>
     </ul>
-    <h2>6.3 日志类别</h2>
+    <p>
+        Both categories default to <code>Log</code>; bump them to
+        <code>Verbose</code> in the editor's <em>Output Log</em> filter to
+        see lifecycle traces.
+    </p>
+
+    <h2>6.4 Source map</h2>
+    <table>
+        <thead>
+            <tr><th>Concern</th><th>Look at</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Module entry point, command registration, custom property runs</td>
+                <td><code>Source/WidgetMarkup/Private/WidgetMarkupModule.cpp</code></td></tr>
+            <tr><td>XML parsing &amp; element stack</td>
+                <td><code>Source/WidgetMarkup/Private/ElementTreeBuilder.cpp</code></td></tr>
+            <tr><td>Property path resolution and writes</td>
+                <td><code>Source/WidgetMarkup/Private/ElementNodes/PropertyChainHandle.cpp</code></td></tr>
+            <tr><td>Live preview window</td>
+                <td><code>Source/WidgetMarkup/Private/Widgets/SWidgetMarkupWindow.cpp</code></td></tr>
+            <tr><td>String &rarr; native value converters</td>
+                <td><code>Source/WidgetMarkup/Private/ConverterRegistry.cpp</code> and <code>Private/Converters/*</code></td></tr>
+            <tr><td>Style sheet application</td>
+                <td><code>Source/WidgetMarkup/Private/Styles/WidgetStyleSheet.cpp</code></td></tr>
+            <tr><td>Python component creation &amp; GIL handling</td>
+                <td><code>Plugins/WidgetMarkupPythonIntegration/Source/WidgetMarkupPythonIntegration/Private/PythonWidgetMarkupComponent.cpp</code></td></tr>
+            <tr><td>Reactive base class</td>
+                <td><code>Plugins/WidgetMarkupPythonIntegration/Content/Python/WidgetMarkupComponent.py</code></td></tr>
+            <tr><td>Observable collection</td>
+                <td><code>Plugins/WidgetMarkupPythonIntegration/Content/Python/ObservableCollection.py</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2>6.5 Further reading</h2>
     <ul>
-        <li>LogWidgetMarkup</li>
-        <li>LogWidgetMarkupPythonIntegration</li>
+        <li><code>Game/Plugins/WidgetMarkup/README.md</code> &mdash; quickstart and links.</li>
+        <li><code>Game/Plugins/WidgetMarkup/HANDOVER.md</code> &mdash; architecture and current risks
+            (intended for plugin maintainers).</li>
+        <li>
+            <a href="https://github.com/9087/Unreal.WidgetMarkup.VSC">VS Code extension</a>
+            &mdash; syntax highlighting and IntelliSense.
+        </li>
     </ul>
 
     <nav class="pager">
-        <a class="prev" href="05-reactive-components.html"><span class="label">上一页</span>&larr; 05 · 响应式 Python 组件</a>
-        <a class="next" href="index.html"><span class="label">下一页</span>返回目录 &rarr;</a>
+        <a class="prev" href="05-reactive-components.html">
+            <span class="label">Previous</span>
+            &larr; 05 &middot; Reactive Python Components
+        </a>
+        <a class="next" href="index.html">
+            <span class="label">Next</span>
+            Back to Contents &rarr;
+        </a>
     </nav>
 </main>
 <div id="manual-footer"></div>

@@ -11,9 +11,10 @@
 <main class="container">
     <h1>5. Reactive Python Components</h1>
     <p class="lead">
-        Use <code>@reactive</code>, <code>@computed</code> and
-        <code>ObservableCollection</code> to build small view-models that
-        notify on every change.
+        Use <code>@reactive</code>, <code>@computed</code>, declarative
+        property binding, and event delegates to build self-contained
+        view-models. <strong>Prefer declarations over imperative code</strong> &mdash;
+        data binding and event binding should be your first choice.
     </p>
 
     <h2>5.1 The base class</h2>
@@ -123,49 +124,125 @@ inv.prime_computed_dependencies()
 inv.items.append('Sword')   # notifies 'items' and 'item_count'
 </code></pre>
 
-    <h2>5.6 Bridging values back to UMG</h2>
+    <h2>5.6 Property binding in XML</h2>
     <p>
-        The integration plugin attaches your Python instance to the
-        UserWidget but does not wire properties to widgets automatically.
-        That keeps the binding policy in your hands: most projects override
-        <code>on_property_changed</code> and call back into Unreal through
-        <code>unreal.find_object()</code> /
-        <code>unreal.MyUserWidget.set_property()</code>:
+        Bind a widget property to a <code>@reactive</code> or
+        <code>@computed</code> Python property directly in XML using
+        <code>{propertyName}</code> syntax:
     </p>
-<pre><code>import unreal
-
-
-class HealthBar(WidgetMarkupComponent):
-    def __init__(self):
-        self.user_widget = None  # set by the host
-        self.prime_computed_dependencies()
-
-    @reactive
-    def current(self): return 100
-    @reactive
-    def maximum(self): return 100
-
-    @computed
-    def percent(self):
-        return self.current / max(self.maximum, 1)
-
-    def on_property_changed(self, property_name, value):
-        if not self.user_widget:
-            return
-        if property_name == 'percent':
-            fill = self.user_widget.get_widget_from_name('HealthFill')
-            if fill:
-                fill.set_percent(value)
-        elif property_name == 'current':
-            text = self.user_widget.get_widget_from_name('HealthText')
-            if text:
-                text.set_text(unreal.Text(str(int(value))))
+<pre><code>&lt;TextBlock Text="{display_value}" Font.Size="18" /&gt;
+&lt;ProgressBar Percent="{progress}" /&gt;
+&lt;CheckBox IsChecked="{enabled}" /&gt;
 </code></pre>
+    <p>
+        When <code>self.display_value = "new"</code> is assigned in Python,
+        the TextBlock updates automatically &mdash; no manual widget lookup
+        or <code>set_text()</code> calls required. The binding name must
+        match the <code>@reactive</code> property name exactly.
+    </p>
     <div class="note">
-        Future revisions of the integration plugin may add a built-in
-        binding layer; for now, this hand-written pattern is the supported
-        way to push reactive values into the widget tree.
+        <strong>Design principle:</strong> Always prefer
+        <code>{property}</code> data binding over manual
+        <code>find_widget</code> + setter calls. Manual widget manipulation
+        is a last resort, not the default pattern.
     </div>
+
+    <h2>5.7 Event binding</h2>
+    <p>
+        Connect widget events to Python handler methods with
+        <code>OnClicked="method_name"</code> or
+        <code>OnMouseButtonDownEvent="method_name"</code>:
+    </p>
+<pre><code>&lt;!-- Button click --&gt;
+&lt;Button OnClicked="on_confirm"&gt;
+  &lt;TextBlock Text="Confirm" /&gt;
+&lt;/Button&gt;
+
+&lt;!-- Mouse button on Border (supports left/right distinction) --&gt;
+&lt;Border OnMouseButtonDownEvent="on_cell_click"
+        BrushColor="0.72,0.72,0.74,1"&gt;
+  &lt;TextBlock Text="{label}" Visibility="HitTestInvisible" /&gt;
+&lt;/Border&gt;
+</code></pre>
+    <p>Python handler signatures:</p>
+<pre><code>def on_confirm(self):
+    self.status = "Confirmed"
+
+def on_cell_click(self, geometry: unreal.Geometry, mouse_event: unreal.PointerEvent):
+    ...
+    return unreal.WidgetLibrary.handled()
+</code></pre>
+
+    <h2>5.8 Pointer events and InputLibrary</h2>
+    <p>
+        UE's <code>FPointerEvent::EffectingButton</code> is not exposed to
+        Python reflection. WidgetMarkup provides
+        <code>widget_markup.InputLibrary</code> (backed by
+        <code>UWidgetMarkupInputLibrary</code> with <code>UPARAM(ref)</code>)
+        to read button state correctly:
+    </p>
+<pre><code>import widget_markup
+
+def on_mouse_down(self, geometry, mouse_event):
+    key = widget_markup.InputLibrary.pointer_event_get_effecting_button(mouse_event)
+    if key == widget_markup.Key.RightMouseButton:
+        self.flag()
+    elif key == widget_markup.Key.LeftMouseButton:
+        self.reveal()
+    return unreal.WidgetLibrary.handled()
+</code></pre>
+    <p>
+        <code>widget_markup.Key</code> provides <code>EKeys</code> constants
+        (e.g. <code>LeftMouseButton</code>, <code>RightMouseButton</code>).
+        Do NOT use <code>mouse_event.effecting_button</code> or
+        <code>mouse_event.get_editor_property()</code> &mdash; they return
+        <code>None</code>.
+    </p>
+
+    <h2>5.9 Dynamic child widgets</h2>
+    <p>
+        Create and remove child widgets at runtime with
+        <code>add_child</code> and <code>remove_child</code>:
+    </p>
+<pre><code># Create a WidgetMarkup child blueprint dynamically
+cell = self.add_child("Cell_0_0", "/WidgetMarkup/Samples/MinesweeperCell", parent_panel)
+
+# Register a click callback on the child
+cell.on_click = lambda geo, evt: self._handle_click(geo, evt)
+
+# Remove by name or reference
+self.remove_child("Cell_0_0")
+</code></pre>
+    <p>
+        <code>add_child(name, class_token, parent)</code> compiles the
+        blueprint on demand (if not already cached), creates the widget,
+        adds it to the parent panel, and returns the
+        <code>WidgetMarkupComponent</code> (or <code>None</code> for plain
+        UMG widgets).
+    </p>
+
+    <h2>5.10 Design principles</h2>
+    <p>Follow these priorities when building WidgetMarkup components:</p>
+    <ol>
+        <li><strong>Data binding</strong> (<code>{reactive}</code> /
+            <code>{computed}</code>) &mdash; push data to widgets
+            declaratively.</li>
+        <li><strong>Event binding</strong> (<code>OnClicked="handler"</code> /
+            <code>OnMouseButtonDownEvent</code>) &mdash; react to user input
+            through the XML delegate system.</li>
+        <li><strong>Manual widget access</strong>
+            (<code>find_widget</code> + setter) &mdash; only when binding
+            cannot express the behavior.</li>
+    </ol>
+    <p>
+        <strong>Minimize coupling between components.</strong> Use
+        <code>@computed</code> to derive visuals from local
+        <code>@reactive</code> state instead of reaching into parent
+        components. Route child-to-parent communication through callback
+        registration (e.g. <code>cell.on_click = lambda ...</code>) rather
+        than direct parent method calls. Cross-instance dependencies are
+        <em>not</em> auto-tracked by the reactive system &mdash; keep them
+        explicit and minimal.</p>
 
     <nav class="pager">
         <a class="prev" href="04-python-integration.html">

@@ -43,6 +43,8 @@ is_right = widget_markup.InputLibrary.pointer_event_is_mouse_button_down(
 
 These helpers mirror `unreal.InputLibrary` pointer-event APIs and are tailored for the WidgetMarkup delegate workflow. `mouse_event.get_editor_property("effecting_button")` is also unavailable.
 
+> **Why the wrapper?** UE's `FPointerEvent::EffectingButton` is not exposed to Python reflection, so WidgetMarkup provides `UWidgetMarkupInputLibrary` (C++) with `UPARAM(ref)` to correctly marshal `FKey` and `FPointerEvent` between C++ and Python. The `widget_markup.InputLibrary` Python module wraps this C++ class. When writing `OnMouseButtonDownEvent` handlers, always use `widget_markup.InputLibrary` for reading button state — do NOT attempt `mouse_event.effecting_button` or `mouse_event.get_editor_property(...)`.
+
 ## FKey — use `widget_markup.Key` for `EKeys` constants
 
 `unreal.Key` wraps the `FKey` **struct** (`key_name: FName`). C++ defines well-known keys as `EKeys::LeftMouseButton`, `EKeys::RightMouseButton`, and so on — static `FKey` values, **not** a `UENUM`. UE does not export them on `unreal.Key`.
