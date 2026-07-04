@@ -22,6 +22,12 @@
                     Slot.Padding="4,0,4,0">
               <TextBlock Text=":)" Font.Size="22" />
             </Button>
+            <Border BrushColor="0.12,0.12,0.14,1" Padding="8,4,8,4"
+                    Slot.Padding="12,0,0,0">
+              <TextBlock Text="{elapsed_time}"
+                         Font.Size="28"
+                         ColorAndOpacity="1,0.15,0.15,1" />
+            </Border>
           </HorizontalBox>
           <TextBlock Text="{status_text}"
                      Font.Size="18"

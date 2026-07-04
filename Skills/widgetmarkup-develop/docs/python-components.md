@@ -17,6 +17,24 @@
 - Use **callback registration** (e.g., `cell.on_click = lambda ...`) instead of children calling parent methods directly.
 - Cross-instance dependencies are NOT auto-tracked by the reactive system. If unavoidable, keep them explicit and minimal.
 
+**In a dependency chain, every mutable property MUST be `@reactive`.** `@computed` tracks dependencies by intercepting reads of `@reactive` and `@computed` descriptors. Plain Python attributes (e.g. `self._start_time`) are invisible to the tracker — changing them will NOT trigger recomputation. If a `@computed` property reads a value that can change, that value must be a `@reactive` property:
+
+```python
+# BROKEN: _start_time is a plain attribute, elapsed won't recompute on its own
+@computed
+def elapsed(self) -> int:
+    return int(self.current_time - self._start_time)   # _start_time change ignored!
+
+# CORRECT: both sources are @reactive, both trigger recomputation
+@reactive
+def start_time(self) -> float:
+    return 0.0
+
+@computed
+def elapsed(self) -> int:
+    return int(self.current_time - self.start_time)  # tracks both
+```
+
 ## Basic Component
 
 ```python

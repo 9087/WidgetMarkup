@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import time
 
 import unreal
 from WidgetMarkupComponent import WidgetMarkupComponent, computed, reactive
@@ -26,12 +27,31 @@ class Minesweeper(WidgetMarkupComponent):
     def flag_count(self) -> int:
         return 0
 
+    @reactive
+    def current_time(self) -> float:
+        return 0.0
+
+    @reactive
+    def start_time(self) -> float:
+        return 0.0
+
+    @computed
+    def elapsed(self) -> int:
+        return int(self.current_time - self.start_time)
+
+    @computed
+    def elapsed_time(self) -> str:
+        minutes = self.elapsed // 60
+        seconds = self.elapsed % 60
+        return f"{minutes:02d}:{seconds:02d}"
+
     def __init__(self) -> None:
         self._grid: list[list[MinesweeperCell]] = []
         self._cells_created = False
         self._game_over = False
         self._won = False
         self._mines_placed = False
+        self._timer_handle = None
         super().__init__()
         self.start_new_game()
 
@@ -117,6 +137,9 @@ class Minesweeper(WidgetMarkupComponent):
         self._won = False
         self._mines_placed = False
         self.flag_count = 0
+        self.start_time = 0.0
+        self.current_time = 0.0
+        self._stop_timer()
         self.status_text = "Left click to reveal, right click to flag"
 
     def handle_cell_click(self, row: int, column: int) -> None:
@@ -130,6 +153,7 @@ class Minesweeper(WidgetMarkupComponent):
         if not self._mines_placed:
             self._place_mines(row, column)
             self._mines_placed = True
+            self._start_timer()
 
         if cell.state != CellState.HIDDEN:
             return
@@ -226,6 +250,7 @@ class Minesweeper(WidgetMarkupComponent):
         return True
 
     def _end_game(self, won: bool) -> None:
+        self._stop_timer()
         self._won = won
         self._game_over = not won
 
@@ -243,3 +268,23 @@ class Minesweeper(WidgetMarkupComponent):
                     cell = self._grid[row][column]
                     if cell.is_mine:
                         cell.state = CellState.REVEALED
+
+    # --- Timer ---
+
+    def _start_timer(self) -> None:
+        """Begin elapsed-time counting via post-tick callback."""
+        if self._timer_handle is not None:
+            return
+        self.start_time = time.time()
+        self.current_time = self.start_time
+        self._timer_handle = unreal.register_slate_post_tick_callback(self._on_timer_tick)
+
+    def _stop_timer(self) -> None:
+        """Stop the timer tick callback if active."""
+        if self._timer_handle is None:
+            return
+        unreal.unregister_slate_post_tick_callback(self._timer_handle)
+        self._timer_handle = None
+
+    def _on_timer_tick(self, delta_time: float) -> None:
+        self.current_time = time.time()
