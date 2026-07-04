@@ -235,7 +235,7 @@ See [docs/python-components.md](docs/python-components.md) for the complete Pyth
 
 > **Design principles:** Prefer data binding (`@reactive`/`@computed`) and event binding (`OnClicked`/`OnMouseButtonDownEvent`) over manual widget manipulation. Minimize coupling between WidgetMarkupComponents — use `@computed` (local derivation) and callback registration instead of reaching into parent/child internals. See [Design Principles](docs/python-components.md#design-principles) for details.
 
-> **WidgetMarkup `unreal` API:** Python runs in WidgetMarkup, not the full Editor. Use native **`unreal`** by default; check **`widget_markup`** only for APIs listed in [unreal-python-api.md](docs/unreal-python-api.md). Library names follow UE `ScriptName` (`unreal.WidgetLibrary`, not `WidgetBlueprintLibrary`). For `PointerEvent` in widget delegates, prefer `widget_markup.InputLibrary`.
+> **WidgetMarkup `unreal` API:** Python runs in WidgetMarkup, not the full Editor. Use native **`unreal`** by default. Library names follow UE `ScriptName` (`unreal.WidgetLibrary`, not `WidgetBlueprintLibrary`). For pointer-event input (mouse buttons), use `mouse_event.effecting_button.get_editor_property("key_name")` directly — see [PointerEvent](docs/unreal-python-api.md#pointerevent--use-effecting_buttonget_editor_propertykey_name).
 
 - **`@reactive`** — settable properties (int, float, str, bool, list) that auto-push to bound widgets
 - **`@computed`** — read-only derived properties with automatic dependency tracking
