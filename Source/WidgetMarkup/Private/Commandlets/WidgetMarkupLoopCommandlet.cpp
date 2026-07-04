@@ -90,7 +90,7 @@ int32 UWidgetMarkupLoopCommandlet::Main(const FString& Params)
 	WidgetMarkupModule.SetExtraArguments(ExtraArguments);
 
 	FModuleManager::Get().LoadModule(TEXT("PythonScriptPlugin"));
-	FModuleManager::Get().LoadModule(TEXT("WidgetMarkupPythonIntegration"));
+	FModuleManager::Get().LoadModule(TEXT("WidgetMarkupPythonScripting"));
 
 	WidgetMarkupModule.ExecuteOrRegisterOnInitialized(FSimpleDelegate::CreateLambda([PackagePath, &WidgetMarkupWindow, &ExitCode]()
 	{

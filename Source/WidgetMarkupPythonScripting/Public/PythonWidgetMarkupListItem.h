@@ -9,10 +9,10 @@
 
 /**
  * List item data wrapper that caches a Python object for WidgetMarkup ListView items.
- * Lives in WidgetMarkupPythonIntegration so it can hold a PyObject reference.
+ * Lives in WidgetMarkupPythonScripting so it can hold a PyObject reference.
  */
 UCLASS(BlueprintType)
-class WIDGETMARKUPPYTHONINTEGRATION_API UPythonWidgetMarkupListItem : public UObject
+class WIDGETMARKUPPYTHONSCRIPTING_API UPythonWidgetMarkupListItem : public UObject
 {
 	GENERATED_BODY()
 

@@ -7,7 +7,7 @@
 #include "Classes/PythonDataBinding.h"
 #include "PythonUtilities.h"
 #include "Classes/PythonWidgetLibrary.h"
-#include "WidgetMarkupPythonIntegration.h"
+#include "WidgetMarkupPythonScripting.h"
 
 #if defined(WITH_PYTHON) && WITH_PYTHON
 
@@ -38,7 +38,7 @@ bool RegisterPythonWidgetMarkupModule()
 {
 	if (!Py_IsInitialized())
 	{
-		UE_LOG(LogWidgetMarkupPythonIntegration, Display, TEXT("WidgetMarkup native Python module registration skipped because Python is not available yet."));
+		UE_LOG(LogWidgetMarkupPythonScripting, Display, TEXT("WidgetMarkup native Python module registration skipped because Python is not available yet."));
 		return false;
 	}
 
@@ -58,7 +58,7 @@ bool RegisterPythonWidgetMarkupModule()
 	if (!PyModule)
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Failed to register native Python module '%hs': %s"), NativeModuleName, *ErrorMessage);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Failed to register native Python module '%hs': %s"), NativeModuleName, *ErrorMessage);
 		return false;
 	}
 
@@ -71,14 +71,14 @@ bool RegisterPythonWidgetMarkupModule()
 	if (!bRegisteredTypes)
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Failed to register widget_markup Python types: %s"), *ErrorMessage);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Failed to register widget_markup Python types: %s"), *ErrorMessage);
 		return false;
 	}
 
 	if (PyDict_SetItemString(PyModules, NativeModuleName, PyModule.Get()) != 0)
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Failed to expose native Python module '%hs': %s"), NativeModuleName, *ErrorMessage);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Failed to expose native Python module '%hs': %s"), NativeModuleName, *ErrorMessage);
 		return false;
 	}
 

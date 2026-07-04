@@ -6,20 +6,20 @@
 #include "IPythonScriptPlugin.h"
 #include "PythonUtilities.h"
 #include "PythonWidgetMarkupListItem.h"
-#include "WidgetMarkupPythonIntegration.h"
+#include "WidgetMarkupPythonScripting.h"
 
 TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UUserWidget* InUserWidget, const FString& InScript)
 {
 	if (!InUserWidget)
 	{
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Cannot create Python component because UserWidget is null."));
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Cannot create Python component because UserWidget is null."));
 		return nullptr;
 	}
 
 	const FString Script = InScript.TrimStartAndEnd();
 	if (Script.IsEmpty())
 	{
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Script is empty."));
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Script is empty."));
 		return nullptr;
 	}
 
@@ -28,18 +28,18 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	IPythonScriptPlugin* PythonScriptPlugin = IPythonScriptPlugin::Get();
 	if (!PythonScriptPlugin)
 	{
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("PythonScriptPlugin module is not loaded."));
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("PythonScriptPlugin module is not loaded."));
 		return nullptr;
 	}
 
 	if (!PythonScriptPlugin->IsPythonAvailable())
 	{
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Python is not available; Script '%s' was skipped."), *Script);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Python is not available; Script '%s' was skipped."), *Script);
 		return nullptr;
 	}
 
 #if !defined(WITH_PYTHON) || !WITH_PYTHON
-	UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("WITH_PYTHON is disabled, cannot create python component for Script '%s'."), *Script);
+	UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("WITH_PYTHON is disabled, cannot create python component for Script '%s'."), *Script);
 	return nullptr;
 #else
 	FPythonGILScope GILScope;
@@ -52,7 +52,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	if (!PyComponentBaseModule)
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Failed to import component base module '%s' for Script '%s': %s"), WidgetMarkupComponentModuleName, *Script, *ErrorMessage);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Failed to import component base module '%s' for Script '%s': %s"), WidgetMarkupComponentModuleName, *Script, *ErrorMessage);
 		return nullptr;
 	}
 
@@ -60,7 +60,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	if (!PyComponentBaseClass)
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Module '%s' does not expose class '%hs' for Script '%s': %s"), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, *Script, *ErrorMessage);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Module '%s' does not expose class '%hs' for Script '%s': %s"), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, *Script, *ErrorMessage);
 		return nullptr;
 	}
 
@@ -68,13 +68,13 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	if (!PyFactoryFunction)
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Class '%s.%hs' does not expose static method '%hs' for Script '%s': %s"), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, WidgetMarkupComponentCreateFunctionName, *Script, *ErrorMessage);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Class '%s.%hs' does not expose static method '%hs' for Script '%s': %s"), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, WidgetMarkupComponentCreateFunctionName, *Script, *ErrorMessage);
 		return nullptr;
 	}
 
 	if (!PyCallable_Check(PyFactoryFunction.Get()))
 	{
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("'%s.%hs.%hs' is not callable for Script '%s'."), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, WidgetMarkupComponentCreateFunctionName, *Script);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("'%s.%hs.%hs' is not callable for Script '%s'."), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, WidgetMarkupComponentCreateFunctionName, *Script);
 		return nullptr;
 	}
 
@@ -85,7 +85,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	if (!PyArgs)
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Failed to allocate create arguments for Script '%s': %s"), *Script, *ErrorMessage);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Failed to allocate create arguments for Script '%s': %s"), *Script, *ErrorMessage);
 		return nullptr;
 	}
 
@@ -93,7 +93,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	if (!PyModuleNameArgument)
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Failed to convert module name '%s' to python argument for Script '%s': %s"), *ScriptModuleName, *Script, *ErrorMessage);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Failed to convert module name '%s' to python argument for Script '%s': %s"), *ScriptModuleName, *Script, *ErrorMessage);
 		return nullptr;
 	}
 
@@ -104,7 +104,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	if (!PyInstanceObject)
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
-		UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("'%s.%hs.%hs' failed for module '%s' (Script '%s'): %s"), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, WidgetMarkupComponentCreateFunctionName, *ScriptModuleName, *Script, *ErrorMessage);
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("'%s.%hs.%hs' failed for module '%s' (Script '%s'): %s"), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, WidgetMarkupComponentCreateFunctionName, *ScriptModuleName, *Script, *ErrorMessage);
 		return nullptr;
 	}
 

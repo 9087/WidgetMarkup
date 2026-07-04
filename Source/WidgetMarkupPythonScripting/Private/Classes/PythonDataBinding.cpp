@@ -13,7 +13,7 @@
 #include "PythonWidgetMarkupListItem.h"
 #include "Utilities/WidgetPropertyPath.h"
 #include "WidgetMarkupModule.h"
-#include "WidgetMarkupPythonIntegration.h"
+#include "WidgetMarkupPythonScripting.h"
 
 #if defined(WITH_PYTHON) && WITH_PYTHON
 
@@ -293,7 +293,7 @@ namespace
 		UWidget* TargetWidget = UserWidget->WidgetTree->FindWidget(Binding.TargetObjectName);
 		if (!TargetWidget)
 		{
-			UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Binding skipped because target widget '%s' was not found."), *Binding.TargetObjectName.ToString());
+			UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Binding skipped because target widget '%s' was not found."), *Binding.TargetObjectName.ToString());
 			Py_RETURN_NONE;
 		}
 
@@ -302,14 +302,14 @@ namespace
 		FString ParseError;
 		if (!FWidgetPropertyPath::TryParse(FStringView(Binding.TargetPropertyPath), TargetPropertyPath, &ParseError))
 		{
-			UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='Invalid property path: %s'."), *Binding.SourceExpression, *Binding.TargetObjectName.ToString(), *Binding.TargetPropertyPath, *ParseError);
+			UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='Invalid property path: %s'."), *Binding.SourceExpression, *Binding.TargetObjectName.ToString(), *Binding.TargetPropertyPath, *ParseError);
 			Py_RETURN_NONE;
 		}
 
 		TSharedPtr<FPropertyChainHandle> PropertyChain = FPropertyChainHandle::Create(TargetWidget, TargetPropertyPath);
 		if (!PropertyChain.IsValid())
 		{
-			UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='Could not resolve property chain on '%s'.'"),
+			UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='Could not resolve property chain on '%s'.'"),
 				*Binding.SourceExpression, *Binding.TargetObjectName.ToString(), *Binding.TargetPropertyPath, *TargetWidget->GetClass()->GetName());
 			Py_RETURN_NONE;
 		}
@@ -317,7 +317,7 @@ namespace
 		FProperty* TailProperty = PropertyChain->GetTailProperty();
 		if (!TailProperty)
 		{
-			UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='Could not resolve terminal property on '%s'.'"),
+			UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='Could not resolve terminal property on '%s'.'"),
 				*Binding.SourceExpression, *Binding.TargetObjectName.ToString(), *Binding.TargetPropertyPath, *TargetWidget->GetClass()->GetName());
 			Py_RETURN_NONE;
 		}
@@ -325,7 +325,7 @@ namespace
 		FPropertyBuffer PropertyBuffer(TailProperty);
 		if (!PropertyBuffer.HasValue())
 		{
-			UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='Could not allocate buffer for property type '%s'.'"),
+			UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='Could not allocate buffer for property type '%s'.'"),
 				*Binding.SourceExpression, *Binding.TargetObjectName.ToString(), *Binding.TargetPropertyPath, *TailProperty->GetClass()->GetName());
 			Py_RETURN_NONE;
 		}
@@ -338,7 +338,7 @@ namespace
 				ExpectedType += FString::Printf(TEXT(" (%s)"), *StructProperty->Struct->GetName());
 			}
 			const FString FallbackString = FPythonUtilities::PythonObjectToString(PyValue);
-			UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Binding: SourceExpression='%s', Target='%s.%s', Python value could not be converted to '%s', falling back to string."),
+			UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Binding: SourceExpression='%s', Target='%s.%s', Python value could not be converted to '%s', falling back to string."),
 				*Binding.SourceExpression, *Binding.TargetObjectName.ToString(), *Binding.TargetPropertyPath, *ExpectedType);
 
 			FPropertyBuffer FallbackBuffer(TailProperty, FStringView(FallbackString));
@@ -348,7 +348,7 @@ namespace
 			}
 			else
 			{
-				UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='String fallback also failed.'"),
+				UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='String fallback also failed.'"),
 					*Binding.SourceExpression, *Binding.TargetObjectName.ToString(), *Binding.TargetPropertyPath);
 				Py_RETURN_NONE;
 			}
@@ -356,7 +356,7 @@ namespace
 
 		if (!WidgetMarkupModule->ApplyPropertyValue(TargetWidget, TargetPropertyPath, PropertyBuffer, &Error))
 		{
-			UE_LOG(LogWidgetMarkupPythonIntegration, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='%s'."), *Binding.SourceExpression, *Binding.TargetObjectName.ToString(), *Binding.TargetPropertyPath, *Error.ToString());
+			UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Binding failed: SourceExpression='%s', Target='%s.%s', Reason='%s'."), *Binding.SourceExpression, *Binding.TargetObjectName.ToString(), *Binding.TargetPropertyPath, *Error.ToString());
 		}
 		Py_RETURN_NONE;
 	}

@@ -3,9 +3,9 @@
 using System.IO;
 using UnrealBuildTool;
 
-public class WidgetMarkupPythonIntegration : ModuleRules
+public class WidgetMarkupPythonScripting : ModuleRules
 {
-	public WidgetMarkupPythonIntegration(ReadOnlyTargetRules Target) : base(Target)
+	public WidgetMarkupPythonScripting(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		OptimizeCode = CodeOptimization.Never;
