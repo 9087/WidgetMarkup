@@ -81,6 +81,7 @@ class MinesweeperCell(WidgetMarkupComponent):
 
     def __init__(self) -> None:
         self.on_click: Callable[[unreal.Geometry, unreal.WidgetMarkupPointerEvent], Any] | None = None
+        self.on_release: Callable[[unreal.Geometry, unreal.WidgetMarkupPointerEvent], Any] | None = None
         super().__init__()
 
     # --- Input ---
@@ -90,4 +91,11 @@ class MinesweeperCell(WidgetMarkupComponent):
     ) -> Any:
         if self.on_click is not None:
             return self.on_click(geometry, mouse_event)
+        return unreal.WidgetLibrary.handled()
+
+    def on_mouse_up(
+        self, geometry: unreal.Geometry, mouse_event: unreal.WidgetMarkupPointerEvent,
+    ) -> Any:
+        if self.on_release is not None:
+            return self.on_release(geometry, mouse_event)
         return unreal.WidgetLibrary.handled()

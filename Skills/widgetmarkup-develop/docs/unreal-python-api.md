@@ -8,7 +8,7 @@ Most APIs live on **`unreal`**: widget types, delegates, `unreal.WidgetLibrary`,
 
 **Lookup order:** check `widget_markup` only for APIs listed in [widget_markup native module](#widget_markup-native-module) below (or called out elsewhere in this doc). If a function or type is not there, use native **`unreal`** — but confirm names against [ScriptName](#scriptname-vs-c-class-name) rules; WidgetMarkup does not expose the full Editor API.
 
-Examples on `unreal`: `unreal.WidgetLibrary.handled()`, `unreal.UserWidget`, `unreal.SystemLibrary.print_string`. Prefer `widget_markup` only where this doc says so (e.g. `InputLibrary` / `Key` for pointer events in delegate handlers).
+Examples on `unreal`: `unreal.WidgetLibrary.handled()`, `unreal.UserWidget`, `unreal.SystemLibrary.print_string`. For pointer-event input (mouse buttons), use `mouse_event.effecting_button.get_editor_property("key_name")` directly — see [PointerEvent](#pointerevent--use-effecting_buttonget_editor_propertykey_name).
 
 ## ScriptName vs C++ class name
 
@@ -22,50 +22,50 @@ Blueprint function libraries are exported under their `ScriptName` meta, **not**
 
 `unreal.KismetInputLibrary` and `unreal.WidgetBlueprintLibrary` are **`None`** in WidgetMarkup. `unreal.load_class(None, "/Script/Engine.KismetInputLibrary")` returns a `UClass` but does **not** expose static UFUNCTIONs as Python methods — use the `ScriptName` entry on `unreal` instead.
 
-## PointerEvent — prefer `widget_markup.InputLibrary`
+## PointerEvent — use `effecting_button.get_editor_property("key_name")`
 
-`unreal.PointerEvent` is passed to `OnMouseButtonDownEvent` handlers, but **`effecting_button` is not a readable Python property** (the underlying `FPointerEvent::EffectingButton` member is not exported to reflection).
+`unreal.PointerEvent` is passed to `OnMouseButtonDownEvent` / `OnMouseButtonUpEvent` handlers. The event type in WidgetMarkup is `unreal.WidgetMarkupPointerEvent` (not `unreal.PointerEvent`).
 
-In widget delegate handlers, **prefer** `widget_markup.InputLibrary` for reading pointer input:
+**`mouse_event.effecting_button`** is a readable property returning an `unreal.Key`. Use `get_editor_property("key_name")` to read the key name:
 
 ```python
-import widget_markup
-
-button_key = widget_markup.InputLibrary.pointer_event_get_effecting_button(mouse_event)
-button_name = str(button_key.key_name)  # e.g. "LeftMouseButton", "RightMouseButton"
-
-is_right = widget_markup.InputLibrary.pointer_event_is_mouse_button_down(
-    mouse_event, widget_markup.Key.RightMouseButton
-)
+key_name = str(mouse_event.effecting_button.get_editor_property("key_name"))
+# Returns strings like "LeftMouseButton", "RightMouseButton", "MiddleMouseButton"
 ```
 
-`pointer_event_is_mouse_button_down` accepts an `unreal.Key` instance, a `widget_markup.Key` constant, or a key **name string** (the `FName` used by `EKeys`, e.g. `"LeftMouseButton"`).
+## FKey — use `get_editor_property("key_name")`
 
-These helpers mirror `unreal.InputLibrary` pointer-event APIs and are tailored for the WidgetMarkup delegate workflow. `mouse_event.get_editor_property("effecting_button")` is also unavailable.
-
-> **Why the wrapper?** UE's `FPointerEvent::EffectingButton` is not exposed to Python reflection, so WidgetMarkup provides `UWidgetMarkupInputLibrary` (C++) with `UPARAM(ref)` to correctly marshal `FKey` and `FPointerEvent` between C++ and Python. The `widget_markup.InputLibrary` Python module wraps this C++ class. When writing `OnMouseButtonDownEvent` handlers, always use `widget_markup.InputLibrary` for reading button state — do NOT attempt `mouse_event.effecting_button` or `mouse_event.get_editor_property(...)`.
-
-## FKey — use `widget_markup.Key` for `EKeys` constants
-
-`unreal.Key` wraps the `FKey` **struct** (`key_name: FName`). C++ defines well-known keys as `EKeys::LeftMouseButton`, `EKeys::RightMouseButton`, and so on — static `FKey` values, **not** a `UENUM`. UE does not export them on `unreal.Key`.
-
-WidgetMarkup provides **`widget_markup.Key`**: a namespace class whose attributes mirror `EKeys` member names. Each value is an `unreal.Key` ready for `InputLibrary` helpers or direct comparison:
+`unreal.Key` wraps the `FKey` struct. UE does not export `EKeys` constants as class attributes on `unreal.Key`, nor does it expose `.key_name` as a Python property. Use `get_editor_property("key_name")` and compare as string:
 
 ```python
-import widget_markup
+key_name = str(mouse_event.effecting_button.get_editor_property("key_name"))
 
-button_key = widget_markup.InputLibrary.pointer_event_get_effecting_button(mouse_event)
-if button_key == widget_markup.Key.RightMouseButton:
+if "RightMouseButton" in key_name:
     self.flag_cell()
-elif button_key == widget_markup.Key.LeftMouseButton:
+elif "LeftMouseButton" in key_name:
     self.reveal_cell()
-
-widget_markup.InputLibrary.pointer_event_is_mouse_button_down(
-    mouse_event, widget_markup.Key.LeftMouseButton
-)
 ```
 
-`widget_markup.Key` cannot be instantiated. VR-controller keys from `EKeys` are not exported yet; use a key name string if needed.
+For chord detection (simultaneous left+right press), track button state across `OnMouseButtonDownEvent` / `OnMouseButtonUpEvent` since each event carries only one effecting button:
+
+```python
+# In on_mouse_down:
+if "RightMouseButton" in key_name:
+    self._right_down = True
+else:
+    self._left_down = True
+
+if self._left_down and self._right_down:
+    self._chord(row, column)
+
+# In on_mouse_up:
+if "RightMouseButton" in key_name:
+    self._right_down = False
+else:
+    self._left_down = False
+```
+
+> **Note:** `unreal.Key` has no class-level key constants. Use plain strings like `"LeftMouseButton"` for comparison. The `.key_name` attribute is not a readable Python property — always use `get_editor_property("key_name")`.
 
 ## WidgetLibrary for event replies
 
@@ -92,11 +92,11 @@ Not `unreal.WidgetBlueprintLibrary.handled()`.
 Set decorative child text to `Visibility="HitTestInvisible"` so it does not steal hit tests from the `Border`.
 
 ```python
-def on_item_tile_mouse_down(self, geometry: unreal.Geometry, mouse_event: unreal.PointerEvent):
-    button_key = widget_markup.InputLibrary.pointer_event_get_effecting_button(mouse_event)
-    if button_key == widget_markup.Key.RightMouseButton:
+def on_item_tile_mouse_down(self, geometry: unreal.Geometry, mouse_event: unreal.WidgetMarkupPointerEvent):
+    key_name = str(mouse_event.effecting_button.get_editor_property("key_name"))
+    if "RightMouseButton" in key_name:
         self.open_item_context_menu()
-    elif button_key == widget_markup.Key.LeftMouseButton:
+    elif "LeftMouseButton" in key_name:
         self.select_item()
     return unreal.WidgetLibrary.handled()
 ```
@@ -126,22 +126,6 @@ WidgetMarkupApp launcher utilities (CLI and process control). Only relevant when
 
 - **`get_extra_arguments()`** — extra command-line arguments passed after the blueprint path.
 - **`request_shutdown()`** — request process exit (used by automated tests).
-
-### `widget_markup.Key`
-
-`EKeys` constants as `unreal.Key` class attributes (keyboard, mouse, gamepad, platform). Not instantiable.
-
-- **`LeftMouseButton`**, **`RightMouseButton`**, **`MiddleMouseButton`**, … — mouse buttons
-- **`A`** … **`Z`**, **`Zero`** … **`Nine`**, **`F1`** … **`F12`**, arrow keys, modifiers, … — keyboard
-- **`Gamepad_FaceButton_Bottom`**, **`Gamepad_DPad_Up`**, … — gamepad
-- See `PythonKey.cpp` for the full exported list
-
-### `widget_markup.InputLibrary`
-
-Pointer-event helpers safe to call from widget delegate handlers (see [PointerEvent](#pointerevent--prefer-widget_markupinputlibrary) above).
-
-- **`pointer_event_get_effecting_button(mouse_event)`** — effecting button as `unreal.Key`.
-- **`pointer_event_is_mouse_button_down(mouse_event, key)`** — whether a button is down; `key` is an `unreal.Key`, a `widget_markup.Key` constant, or a key name string.
 
 ## Reading Widget Properties in Python
 

@@ -52,6 +52,8 @@ class Minesweeper(WidgetMarkupComponent):
         self._won = False
         self._mines_placed = False
         self._timer_handle = None
+        self._left_down = False
+        self._right_down = False
         super().__init__()
         self.start_new_game()
 
@@ -84,6 +86,7 @@ class Minesweeper(WidgetMarkupComponent):
                     continue
 
                 cell.on_click = lambda geo, evt, r=row, c=column: self._on_cell_clicked(r, c, geo, evt)
+                cell.on_release = lambda geo, evt: self._on_button_released(geo, evt)
                 self._grid[row][column] = cell
 
                 child_widget = self.find_widget(name)
@@ -108,9 +111,28 @@ class Minesweeper(WidgetMarkupComponent):
     ) -> Any:
         """Handle click on a cell (registered as on_click callback)."""
         if self._is_right_mouse_button(mouse_event):
+            self._right_down = True
+        else:
+            self._left_down = True
+
+        if self._left_down and self._right_down:
+            self._chord(row, column)
+            return unreal.WidgetLibrary.handled()
+        elif self._is_right_mouse_button(mouse_event):
             self._toggle_flag(self._grid[row][column])
         else:
             self.handle_cell_click(row, column)
+        return unreal.WidgetLibrary.handled()
+
+    def _on_button_released(
+        self,
+        geometry: unreal.Geometry,
+        mouse_event: unreal.WidgetMarkupPointerEvent,
+    ) -> Any:
+        if self._is_right_mouse_button(mouse_event):
+            self._right_down = False
+        else:
+            self._left_down = False
         return unreal.WidgetLibrary.handled()
 
     @staticmethod
@@ -136,6 +158,8 @@ class Minesweeper(WidgetMarkupComponent):
         self._game_over = False
         self._won = False
         self._mines_placed = False
+        self._left_down = False
+        self._right_down = False
         self.flag_count = 0
         self.start_time = 0.0
         self.current_time = 0.0
@@ -178,6 +202,38 @@ class Minesweeper(WidgetMarkupComponent):
         else:
             cell.state = CellState.FLAGGED
             self.flag_count += 1
+
+    def _chord(self, row: int, column: int) -> None:
+        """Reveal neighbors when flags match the cell's number (chord action)."""
+        if self._game_over or self._won:
+            return
+        cell = self._grid[row][column]
+        if cell.state != CellState.REVEALED or cell.is_mine or cell.adjacent_mines == 0:
+            return
+
+        flag_count = 0
+        hidden_neighbors: list[tuple[int, int]] = []
+        for delta_row in (-1, 0, 1):
+            for delta_column in (-1, 0, 1):
+                if delta_row == 0 and delta_column == 0:
+                    continue
+                neighbor_row = row + delta_row
+                neighbor_column = column + delta_column
+                if 0 <= neighbor_row < ROWS and 0 <= neighbor_column < COLS:
+                    neighbor = self._grid[neighbor_row][neighbor_column]
+                    if neighbor.state == CellState.FLAGGED:
+                        flag_count += 1
+                    elif neighbor.state == CellState.HIDDEN:
+                        hidden_neighbors.append((neighbor_row, neighbor_column))
+
+        if flag_count == cell.adjacent_mines:
+            for neighbor_row, neighbor_column in hidden_neighbors:
+                self._reveal_cell(neighbor_row, neighbor_column)
+                if self._grid[neighbor_row][neighbor_column].is_mine:
+                    self._end_game(won=False)
+                    return
+            if self._check_win():
+                self._end_game(won=True)
 
     def _place_mines(self, safe_row: int, safe_column: int) -> None:
         safe_cells = {(safe_row, safe_column)}

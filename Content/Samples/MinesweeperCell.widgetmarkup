@@ -5,7 +5,8 @@
             HorizontalAlignment="HAlign_Center"
             VerticalAlignment="VAlign_Center"
             Padding="4,4,4,4"
-            OnMouseButtonDownEvent="on_mouse_down">
+            OnMouseButtonDownEvent="on_mouse_down"
+            OnMouseButtonUpEvent="on_mouse_up">
       <TextBlock Name="CellLabel"
                  Text="{label}"
                  Font.Size="16"
