@@ -69,7 +69,8 @@
   </StyleSheet>
 
   <WidgetTree>
-    <Border Style="CalculatorShell">
+    <SizeBox WidthOverride="800" HeightOverride="600">
+      <Border Style="CalculatorShell">
       <VerticalBox>
         <Border Style="DisplayPanel"
                 Slot.Size.SizeRule="Fill"
@@ -290,6 +291,7 @@
           </Button>
         </GridPanel>
       </VerticalBox>
-    </Border>
+      </Border>
+    </SizeBox>
   </WidgetTree>
 </WidgetBlueprint>
