@@ -83,7 +83,6 @@ bool UWidgetMarkupWindow::OpenWindow()
 	const FString AssetName = FPackageName::GetShortName(PackagePath);
 	TSharedRef<SWindow> NewWindow = SNew(SWindow)
 		.Title(FText::FromString(AssetName))
-		.ClientSize(FVector2D(800, 600))
 		[SNullWidget::NullWidget];
 	NewWindow->SetOnWindowClosed(FOnWindowClosed::CreateUObject(this, &UWidgetMarkupWindow::HandleSlateWindowClosed));
 	SlateWindow = NewWindow;
@@ -101,9 +100,6 @@ void UWidgetMarkupWindow::RebuildWidget()
 
 	TGuardValue<bool> RebuildGuard(bIsRebuilding, true);
 
-	// Hold a strong local reference because constructing a UMG widget below can pump
-	// Slate events (e.g. layout / focus) and may end up resetting our member SlateWindow
-	// via HandleSlateWindowClosed before we get a chance to call SetContent.
 	const TSharedRef<SWindow> LocalWindow = SlateWindow.ToSharedRef();
 
 	Widget = nullptr;
@@ -136,6 +132,15 @@ void UWidgetMarkupWindow::RebuildWidget()
 	if (NewContent.IsValid())
 	{
 		LocalWindow->SetContent(NewContent.ToSharedRef());
+		LocalWindow->MarkPrepassAsDirty();
+		LocalWindow->SlatePrepass();
+		const FVector2D DesiredSize = NewContent->GetDesiredSize();
+		UE_LOG(LogWidgetMarkup, Log, TEXT("WidgetMarkup window: content DesiredSize = %.0fx%.0f"), DesiredSize.X, DesiredSize.Y);
+		LocalWindow->Resize(FVector2D(
+			FMath::Max(DesiredSize.X, 300.0f),
+			FMath::Max(DesiredSize.Y, 200.0f)
+		));
+		LocalWindow->MarkPrepassAsDirty();
 	}
 }
 
