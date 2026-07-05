@@ -101,7 +101,15 @@ Game\Plugins\WidgetMarkup\Content\Tests\RunTests.bat [Game/YourProject.uproject]
 
 ## 示例
 
-`Content/Samples/` 中提供了带 Python 组件的 `.widgetmarkup` 示例文件，包含响应式计数器、待办列表和自定义组件等。
+`Content/Samples/` 中提供了带 Python 组件的 `.widgetmarkup` 示例文件。
+
+**扫雷** — 9×9 网格，支持左右键同时点击（chord），旗帜计数和响应式计时：
+
+![扫雷](Documents/Minesweeper.png)
+
+**科学计算器** — 样式化按钮、记忆操作和显示绑定：
+
+![科学计算器](Documents/ScientificCalculator.png)
 
 ## 语法插件
 

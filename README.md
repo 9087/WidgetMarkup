@@ -101,7 +101,15 @@ The suite covers widget types, layout panels, stylesheets, reactive bindings, co
 
 ## Samples
 
-Example `.widgetmarkup` files with Python components are in `Content/Samples/`, including reactive counters, todo lists, and custom components.
+Example `.widgetmarkup` files with Python components are in `Content/Samples/`.
+
+**Minesweeper** — 9×9 grid with chord (left+right click), flag counter, and reactive timer:
+
+![Minesweeper](Documents/Minesweeper.png)
+
+**Scientific Calculator** — styled buttons, memory operations, and display binding:
+
+![Scientific Calculator](Documents/ScientificCalculator.png)
 
 ## Language Extension
 
