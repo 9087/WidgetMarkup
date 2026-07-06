@@ -42,6 +42,14 @@ class MinesweeperCell(WidgetMarkupComponent):
     def adjacent_mines(self) -> int:
         return 0
 
+    @reactive
+    def pressed(self) -> bool:
+        return False
+
+    @reactive
+    def highlighted(self) -> bool:
+        return False
+
     # --- Computed visual properties (bound in XML, auto-track reactive deps) ---
 
     @computed
@@ -58,13 +66,29 @@ class MinesweeperCell(WidgetMarkupComponent):
 
     @computed
     def background_color(self) -> unreal.LinearColor:
+        base: unreal.LinearColor
         if self.state == CellState.HIDDEN:
-            return unreal.LinearColor(0.72, 0.72, 0.74, 1.0)
-        if self.state == CellState.FLAGGED:
-            return unreal.LinearColor(0.95, 0.88, 0.35, 1.0)
-        if self.is_mine and self.state == CellState.REVEALED:
-            return unreal.LinearColor(0.95, 0.35, 0.35, 1.0)
-        return unreal.LinearColor(0.86, 0.86, 0.88, 1.0)
+            base = unreal.LinearColor(0.72, 0.72, 0.74, 1.0)
+        elif self.state == CellState.FLAGGED:
+            base = unreal.LinearColor(0.95, 0.88, 0.35, 1.0)
+        elif self.is_mine and self.state == CellState.REVEALED:
+            base = unreal.LinearColor(0.95, 0.35, 0.35, 1.0)
+        else:
+            base = unreal.LinearColor(0.86, 0.86, 0.88, 1.0)
+
+        if self.pressed and self.state == CellState.HIDDEN:
+            return unreal.LinearColor(
+                min(base.r * 1.15, 1.0),
+                min(base.g * 1.15, 1.0),
+                min(base.b * 1.15, 1.0),
+                base.a)
+        if self.highlighted:
+            return unreal.LinearColor(
+                min(base.r * 1.15, 1.0),
+                min(base.g * 1.15, 1.0),
+                min(base.b * 1.15, 1.0),
+                base.a)
+        return base
 
     @computed
     def text_color(self) -> unreal.SlateColor:
@@ -89,13 +113,15 @@ class MinesweeperCell(WidgetMarkupComponent):
     def on_mouse_down(
         self, geometry: unreal.Geometry, mouse_event: unreal.WidgetMarkupPointerEvent,
     ) -> Any:
+        self.pressed = True
         if self.on_click is not None:
-            return self.on_click(geometry, mouse_event)
+            self.on_click(geometry, mouse_event)
         return unreal.WidgetLibrary.handled()
 
     def on_mouse_up(
         self, geometry: unreal.Geometry, mouse_event: unreal.WidgetMarkupPointerEvent,
     ) -> Any:
+        self.pressed = False
         if self.on_release is not None:
             return self.on_release(geometry, mouse_event)
         return unreal.WidgetLibrary.handled()

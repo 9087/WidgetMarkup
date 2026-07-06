@@ -10,13 +10,3 @@ from .DataBinding import DataBinding
 from .InputLibrary import InputLibrary
 from .WidgetLibrary import WidgetLibrary
 from .Application import Application
-
-import sys as _sys
-
-_wm = _sys.modules["_widget_markup"]
-
-# Replace the C types on the _widget_markup module with wrapper classes.
-_wm.Core = Core
-_wm.DataBinding = DataBinding
-_wm.WidgetLibrary = WidgetLibrary
-_wm.Application = Application

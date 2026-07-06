@@ -119,6 +119,9 @@ class Minesweeper(WidgetMarkupComponent):
             self._right_down = True
         else:
             self._left_down = True
+
+        if self._left_down and self._right_down and not self._chord_handled:
+            self._highlight_chord_neighbors(row, column)
         return unreal.WidgetLibrary.handled()
 
     def _on_button_released(
@@ -145,6 +148,7 @@ class Minesweeper(WidgetMarkupComponent):
 
         if not self._left_down and not self._right_down:
             self._chord_handled = False
+            self._clear_all_highlights()
 
         return unreal.WidgetLibrary.handled()
 
@@ -174,6 +178,7 @@ class Minesweeper(WidgetMarkupComponent):
         self._left_down = False
         self._right_down = False
         self._chord_handled = False
+        self._clear_all_highlights()
         self.flag_count = 0
         self.start_time = 0.0
         self.current_time = 0.0
@@ -248,6 +253,32 @@ class Minesweeper(WidgetMarkupComponent):
                     return
             if self._check_win():
                 self._end_game(won=True)
+
+    def _highlight_chord_neighbors(self, row: int, column: int) -> None:
+        """Light up hidden neighbors when both mouse buttons are held."""
+        if self._game_over or self._won:
+            return
+        cell = self._grid[row][column]
+        if cell.state != CellState.REVEALED or cell.is_mine or cell.adjacent_mines == 0:
+            return
+        for delta_row in (-1, 0, 1):
+            for delta_column in (-1, 0, 1):
+                if delta_row == 0 and delta_column == 0:
+                    continue
+                neighbor_row = row + delta_row
+                neighbor_column = column + delta_column
+                if 0 <= neighbor_row < ROWS and 0 <= neighbor_column < COLS:
+                    neighbor = self._grid[neighbor_row][neighbor_column]
+                    if neighbor.state == CellState.HIDDEN:
+                        neighbor.highlighted = True
+
+    def _clear_all_highlights(self) -> None:
+        """Remove chord highlights from all cells."""
+        for row in range(ROWS):
+            for column in range(COLS):
+                cell = self._grid[row][column]
+                if cell is not None:
+                    cell.highlighted = False
 
     def _place_mines(self, safe_row: int, safe_column: int) -> None:
         safe_cells = {(safe_row, safe_column)}
