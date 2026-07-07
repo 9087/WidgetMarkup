@@ -99,7 +99,7 @@ The `<WidgetTree>` element is required inside `<WidgetBlueprint>`. It contains o
 |---|---|---|
 | `<TextBlock>` | [textblock.md](docs/widgets/textblock.md) | `Text`, `ColorAndOpacity`, `Font.Size`, `Justification` |
 | `<Button>` | [button.md](docs/widgets/button.md) | `OnClicked`, `OnPressed`, `OnReleased`, `OnHovered` |
-| `<Border>` | [border.md](docs/widgets/border.md) | `BrushColor`, `Padding` |
+| `<Border>` | [border.md](docs/widgets/border.md) | `BrushColor`, `Padding`, `OnMouseButtonDownEvent`, `OnMouseButtonUpEvent` |
 | `<SizeBox>` | [sizebox.md](docs/widgets/sizebox.md) | `WidthOverride`, `HeightOverride` |
 | `<Image>` | [image.md](docs/widgets/image.md) | `Brush.ResourceObject`, `Brush.ImageSize` |
 | `<ProgressBar>` | [progressbar.md](docs/widgets/progressbar.md) | `Percent`, `FillColorAndOpacity`, `BarFillType` |
@@ -116,6 +116,8 @@ The `<WidgetTree>` element is required inside `<WidgetBlueprint>`. It contains o
 | `<WrapBox>` | [wrap-box.md](docs/widgets/wrap-box.md) | `Slot.bFillEmptySpace`, `Slot.bForceNewLine` |
 | `<ScrollBox>` | [scroll-box.md](docs/widgets/scroll-box.md) | `Slot.Size.SizeRule`, `Slot.Padding` |
 | `<Overlay>` | [overlay.md](docs/widgets/overlay.md) | `Slot.Padding`, `Slot.Alignment` |
+
+> **SizeBox root pattern:** Wrap the WidgetTree root in a `<SizeBox WidthOverride="..." HeightOverride="...">` to give the window a known desired size for auto-sizing. Without this, `UWidgetMarkupWindow` falls back to a 300×200 minimum. All sample blueprints (Minesweeper, ScientificCalculator) use this pattern. Place SizeBox as the direct child of `<WidgetTree>`, then put your normal root widget inside it.
 
 > **GridPanel tip:** Use `<GridPanel>` for grid layouts instead of nesting `<HorizontalBox>` inside `<VerticalBox>`. Children **must** use `Slot.Row` and `Slot.Column` (the `Slot.` prefix is required — bare `Row` causes a parse error because attributes are resolved via `FPropertyPathResolver` on the widget, not on the slot). Set `ColumnFill` and `RowFill` as child elements with `<Float>1.0</Float>` entries for equal sizing:
 > ```xml
@@ -235,7 +237,7 @@ See [docs/python-components.md](docs/python-components.md) for the complete Pyth
 
 > **Design principles:** Prefer data binding (`@reactive`/`@computed`) and event binding (`OnClicked`/`OnMouseButtonDownEvent`) over manual widget manipulation. Minimize coupling between WidgetMarkupComponents — use `@computed` (local derivation) and callback registration instead of reaching into parent/child internals. See [Design Principles](docs/python-components.md#design-principles) for details.
 
-> **WidgetMarkup `unreal` API:** Python runs in WidgetMarkup, not the full Editor. Use native **`unreal`** by default. Library names follow UE `ScriptName` (`unreal.WidgetLibrary`, not `WidgetBlueprintLibrary`). For pointer-event input (mouse buttons), use `mouse_event.effecting_button.get_editor_property("key_name")` directly — see [PointerEvent](docs/unreal-python-api.md#pointerevent--use-effecting_buttonget_editor_propertykey_name).
+> **WidgetMarkup `unreal` API:** Python runs in WidgetMarkup, not the full Editor. Use native **`unreal`** by default. Library names follow UE `ScriptName` (`unreal.WidgetLibrary`, not `WidgetBlueprintLibrary`). For pointer-event input (mouse buttons), use `mouse_event.effecting_button.get_editor_property("key_name")` directly — see [PointerEvent](docs/unreal-python-api.md#pointerevent--use-effecting_buttonget_editor_propertykey_name). For event replies, use `widget_markup.WidgetLibrary.handled()` (returns `FWidgetMarkupEventReply`) — the legacy `unreal.WidgetLibrary.handled()` returns an incompatible `FEventReply`. See [Event Reply](docs/unreal-python-api.md#event-reply--fwidgetmarkupeventreply).
 
 - **`@reactive`** — settable properties (int, float, str, bool, list) that auto-push to bound widgets
 - **`@computed`** — read-only derived properties with automatic dependency tracking

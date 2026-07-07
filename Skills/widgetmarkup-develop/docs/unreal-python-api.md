@@ -67,15 +67,56 @@ else:
 
 > **Note:** `unreal.Key` has no class-level key constants. Use plain strings like `"LeftMouseButton"` for comparison. The `.key_name` attribute is not a readable Python property — always use `get_editor_property("key_name")`.
 
-## WidgetLibrary for event replies
+## Event Reply — FWidgetMarkupEventReply
 
-Return a handled reply from pointer-event handlers:
+WidgetMarkup provides its own Blueprint-compatible event reply struct (`unreal.WidgetMarkupEventReply`) that mirrors Slate's `FReply`. Python handlers **must** return this type from `OnMouseButtonDownEvent` / `OnMouseButtonUpEvent` handlers — the old `unreal.WidgetLibrary.handled()` returns `FEventReply` which is incompatible with the payload system.
+
+**Fields** (read/write via `set_editor_property`): `bIsHandled` (bool), `MouseCaptor` (UWidget*), `MouseLock` (UWidget*), `FocusRecipient` (UWidget*), `bReleaseMouseCapture` (bool), `bShouldSetMousePos` (bool), `RequestedMousePos` (FVector2D).
+
+Prefer `widget_markup.WidgetLibrary` static helpers over raw `set_editor_property`:
 
 ```python
-return unreal.WidgetLibrary.handled()
+import widget_markup
+
+reply = widget_markup.WidgetLibrary.handled()
+widget_markup.WidgetLibrary.capture_mouse(reply, border_widget)       # DOWN
+widget_markup.WidgetLibrary.release_mouse_capture(reply)               # UP
 ```
 
-Not `unreal.WidgetBlueprintLibrary.handled()`.
+## Geometry — FWidgetMarkupGeometry
+
+WidgetMarkup replaces Slate's `FGeometry` with `unreal.WidgetMarkupGeometry`. Fields via `get_editor_property`: `AbsolutePosition` (top-left), `Size` (local size).
+
+**Check boundary on UP** to cancel actions when cursor leaves the widget:
+
+```python
+def on_mouse_up(self, geometry, mouse_event):
+    cursor = widget_markup.WidgetLibrary.get_screen_space_position(mouse_event)
+    if not widget_markup.WidgetLibrary.is_under_location(geometry, cursor):
+        reply = widget_markup.WidgetLibrary.handled()
+        widget_markup.WidgetLibrary.release_mouse_capture(reply)
+        return reply  # cancel — cursor left the widget
+    self.do_action()
+```
+
+> `geometry.is_under_location()` is a C++ method not exposed to Python. Always use `widget_markup.WidgetLibrary.is_under_location(geometry, position)`.
+
+## PointerEvent — ScreenSpacePosition
+
+`FWidgetMarkupPointerEvent` now includes the cursor position:
+
+```python
+cursor = widget_markup.WidgetLibrary.get_screen_space_position(mouse_event)
+```
+
+## WidgetLibrary for event replies (legacy)
+
+```python
+# DEPRECATED — returns FEventReply (wrong type)
+# return unreal.WidgetLibrary.handled()
+```
+
+Use `widget_markup.WidgetLibrary.handled()` instead.
 
 ## Border: distinguishing mouse buttons
 
@@ -115,10 +156,21 @@ Internal binding pipeline used by the markup compiler and reactive property upda
 
 ### `widget_markup.WidgetLibrary`
 
-Widget tree lookup and list-entry data access.
+Widget tree lookup, list-entry data access, and **event reply helpers**.
 
-- **`find_widget_in_user_widget(user_widget, name)`** — find a named widget in the user widget tree.
-- **`get_python_object_from_list_item(list_item)`** — get the Python data object from a `PythonWidgetMarkupListItem`.
+- **`handled()`** — create a handled `FWidgetMarkupEventReply`.
+- **`unhandled()`** — create an unhandled reply.
+- **`capture_mouse(reply, widget)`** — set `MouseCaptor` on the reply.
+- **`release_mouse_capture(reply)`** — set `bReleaseMouseCapture` on the reply.
+- **`lock_mouse_to_widget(reply, widget)`** — set `MouseLock`.
+- **`set_user_focus(reply, widget)`** — set `FocusRecipient`.
+- **`set_mouse_position(reply, position)`** — set cursor position request.
+- **`is_under_location(geometry, screen_position)`** — check if screen point is inside geometry.
+- **`get_screen_space_position(mouse_event)`** — read cursor position from event.
+- **`find_widget_in_user_widget(user_widget, name)`** — find a named widget.
+- **`get_python_object_from_list_item(list_item)`** — get Python data from a list item.
+- **`add_child_widget(user_widget, parent_name, class_token, name)`** — create child widget.
+- **`remove_child_widget(user_widget, child)`** — remove child widget.
 
 ### `widget_markup.Application`
 

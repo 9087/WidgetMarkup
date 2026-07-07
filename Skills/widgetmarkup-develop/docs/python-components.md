@@ -78,6 +78,35 @@ def label(self):
 - Keep internal state in plain instance attributes (for example `self._state`), not in reactive getters. Update the reactive property via assignment when the UI needs to reflect a change.
 - When the property changes, `on_property_changed()` triggers `apply_property_binding`. The binding pipeline converts the Python value to the target UMG property type.
 
+## Visual Feedback States (pressed, highlighted)
+
+For interactive widgets that need press/highlight visual feedback, use `@reactive` boolean flags that `@computed` properties read:
+
+```python
+@reactive
+def pressed(self) -> bool:
+    return False
+
+@reactive
+def highlighted(self) -> bool:
+    return False
+
+@computed
+def background_color(self) -> unreal.LinearColor:
+    base = self._base_color()
+    if self.pressed and self.state == CellState.HIDDEN:
+        return unreal.LinearColor(
+            min(base.r * 1.15, 1.0), min(base.g * 1.15, 1.0),
+            min(base.b * 1.15, 1.0), base.a)
+    if self.highlighted:
+        return unreal.LinearColor(
+            min(base.r * 1.15, 1.0), min(base.g * 1.15, 1.0),
+            min(base.b * 1.15, 1.0), base.a)
+    return base
+```
+
+Set flags in pointer event handlers (`on_mouse_down`/`on_mouse_up`), and clear them in lifecycle methods (`start_new_game`). For chord interactions (simultaneous left+right), use `highlighted` on neighbor cells instead of `pressed` on the clicked cell — this keeps feedback semantically distinct: `pressed` = direct click, `highlighted` = chord target.
+
 ## Multi-Property State
 
 Reactive properties can interact — changing one can trigger updates to others via `@computed`.
