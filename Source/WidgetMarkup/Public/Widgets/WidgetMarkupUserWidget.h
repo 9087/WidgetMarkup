@@ -10,6 +10,7 @@
 #include "WidgetMarkupUserWidget.generated.h"
 
 class UListViewBase;
+class UWidget;
 
 /**
  * Pointer event data with UPROPERTY fields so UFUNCTION marshaling works.
@@ -26,7 +27,79 @@ struct WIDGETMARKUP_API FWidgetMarkupPointerEvent
 	UPROPERTY(BlueprintReadOnly, Category = "Input")
 	TArray<FKey> PressedButtons;
 
+	/** Screen-space cursor position at the time of the event. */
+	UPROPERTY(BlueprintReadOnly, Category = "Input")
+	FVector2D ScreenSpacePosition = FVector2D::ZeroVector;
+
 	FWidgetMarkupPointerEvent() = default;
+};
+
+/**
+ * Blueprint-compatible geometry info extracted from Slate's FGeometry.
+ */
+USTRUCT(BlueprintType, meta = (ScriptName = "WidgetMarkupGeometry"))
+struct WIDGETMARKUP_API FWidgetMarkupGeometry
+{
+	GENERATED_BODY()
+
+	/** Top-left corner in screen space. */
+	UPROPERTY(BlueprintReadOnly, Category = "Geometry")
+	FVector2D AbsolutePosition = FVector2D::ZeroVector;
+
+	/** Local size of the widget. */
+	UPROPERTY(BlueprintReadOnly, Category = "Geometry")
+	FVector2D Size = FVector2D::ZeroVector;
+
+	/** Whether the given screen-space point is inside this widget. */
+	bool IsUnderLocation(FVector2D ScreenPosition) const
+	{
+		return ScreenPosition.X >= AbsolutePosition.X
+			&& ScreenPosition.X <= AbsolutePosition.X + Size.X
+			&& ScreenPosition.Y >= AbsolutePosition.Y
+			&& ScreenPosition.Y <= AbsolutePosition.Y + Size.Y;
+	}
+
+	FWidgetMarkupGeometry() = default;
+	explicit FWidgetMarkupGeometry(const FGeometry& InGeometry)
+		: AbsolutePosition(InGeometry.GetAbsolutePosition())
+		, Size(InGeometry.GetLocalSize())
+	{}
+};
+USTRUCT(BlueprintType, meta = (ScriptName = "WidgetMarkupEventReply"))
+struct WIDGETMARKUP_API FWidgetMarkupEventReply
+{
+	GENERATED_BODY()
+
+	/** Whether the event was handled. */
+	UPROPERTY(BlueprintReadWrite, Category = "Event Reply")
+	bool bIsHandled = false;
+
+	/** Widget that should capture the mouse. */
+	UPROPERTY(BlueprintReadWrite, Category = "Event Reply")
+	TObjectPtr<UWidget> MouseCaptor = nullptr;
+
+	/** Widget that the mouse should be locked to. */
+	UPROPERTY(BlueprintReadWrite, Category = "Event Reply")
+	TObjectPtr<UWidget> MouseLock = nullptr;
+
+	/** Widget that should receive user focus. */
+	UPROPERTY(BlueprintReadWrite, Category = "Event Reply")
+	TObjectPtr<UWidget> FocusRecipient = nullptr;
+
+	/** Release any current mouse capture. */
+	UPROPERTY(BlueprintReadWrite, Category = "Event Reply")
+	bool bReleaseMouseCapture = false;
+
+	/** When true, RequestedMousePos will be applied. */
+	UPROPERTY(BlueprintReadWrite, Category = "Event Reply")
+	bool bShouldSetMousePos = false;
+
+	/** Desired cursor position in desktop space (only used when bShouldSetMousePos is true). */
+	UPROPERTY(BlueprintReadWrite, Category = "Event Reply")
+	FVector2D RequestedMousePos = FVector2D::ZeroVector;
+
+	/** Convert to a native FEventReply that Slate can consume. */
+	FEventReply ToReply() const;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWidgetMarkupEntryReleased);
@@ -45,14 +118,14 @@ class UWidgetMarkupOnPointerEventPayload : public UObject
 
 public:
 	UPROPERTY(BlueprintReadOnly, Category = "Input")
-	FGeometry Geometry;
+	FWidgetMarkupGeometry Geometry;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Input")
 	FWidgetMarkupPointerEvent MouseEvent;
 
 	/** Set to the desired reply in the handler. Default is Unhandled. */
 	UPROPERTY(BlueprintReadWrite, Category = "Output")
-	FEventReply Reply;
+	FWidgetMarkupEventReply Reply;
 };
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FWidgetMarkupOnPointerEvent, UWidgetMarkupOnPointerEventPayload*, Payload);

@@ -116,18 +116,62 @@ bool UWidgetMarkupUserWidget::BindOnPointerEvent(UWidget* Widget, FName Delegate
 	return false;
 }
 
+FEventReply FWidgetMarkupEventReply::ToReply() const
+{
+	FEventReply OutReply;
+
+	OutReply.NativeReply = bIsHandled ? FReply::Handled() : FReply::Unhandled();
+
+	if (MouseCaptor)
+	{
+		if (const TSharedPtr<SWidget> SlateWidget = MouseCaptor->GetCachedWidget())
+		{
+			OutReply.NativeReply.CaptureMouse(SlateWidget.ToSharedRef());
+		}
+	}
+
+	if (MouseLock)
+	{
+		if (const TSharedPtr<SWidget> SlateWidget = MouseLock->GetCachedWidget())
+		{
+			OutReply.NativeReply.LockMouseToWidget(SlateWidget.ToSharedRef());
+		}
+	}
+
+	if (FocusRecipient)
+	{
+		if (const TSharedPtr<SWidget> SlateWidget = FocusRecipient->GetCachedWidget())
+		{
+			OutReply.NativeReply.SetUserFocus(SlateWidget.ToSharedRef(), EFocusCause::SetDirectly);
+		}
+	}
+
+	if (bReleaseMouseCapture)
+	{
+		OutReply.NativeReply.ReleaseMouseCapture();
+	}
+
+	if (bShouldSetMousePos)
+	{
+		OutReply.NativeReply.SetMousePos(FIntPoint(FMath::RoundToInt32(RequestedMousePos.X), FMath::RoundToInt32(RequestedMousePos.Y)));
+	}
+
+	return OutReply;
+}
+
 FEventReply UWidgetMarkupOnPointerEventDelegate::HandlePointerEvent(FGeometry Geometry, FPointerEvent PointerEvent)
 {
 	FWidgetMarkupPointerEvent WidgetMarkupEvent;
 	WidgetMarkupEvent.EffectingButton = PointerEvent.GetEffectingButton();
 	WidgetMarkupEvent.PressedButtons = PointerEvent.GetPressedButtons().Array();
+	WidgetMarkupEvent.ScreenSpacePosition = PointerEvent.GetScreenSpacePosition();
 
 	UWidgetMarkupOnPointerEventPayload* Payload = NewObject<UWidgetMarkupOnPointerEventPayload>(this);
-	Payload->Geometry = Geometry;
+	Payload->Geometry = FWidgetMarkupGeometry(Geometry);
 	Payload->MouseEvent = MoveTemp(WidgetMarkupEvent);
 
 	TargetDelegate.ExecuteIfBound(Payload);
 
-	return Payload->Reply;
+	return Payload->Reply.ToReply();
 }
 

@@ -5,6 +5,7 @@ from typing import Any, Callable
 import enum
 
 import unreal
+import widget_markup
 from WidgetMarkupComponent import WidgetMarkupComponent, computed, reactive
 
 
@@ -104,24 +105,35 @@ class MinesweeperCell(WidgetMarkupComponent):
     # --- Lifecycle ---
 
     def __init__(self) -> None:
-        self.on_click: Callable[[unreal.Geometry, unreal.WidgetMarkupPointerEvent], Any] | None = None
-        self.on_release: Callable[[unreal.Geometry, unreal.WidgetMarkupPointerEvent], Any] | None = None
+        self.on_click: Callable[[unreal.WidgetMarkupGeometry, unreal.WidgetMarkupPointerEvent], Any] | None = None
+        self.on_release: Callable[[unreal.WidgetMarkupGeometry, unreal.WidgetMarkupPointerEvent], Any] | None = None
         super().__init__()
 
     # --- Input ---
 
     def on_mouse_down(
-        self, geometry: unreal.Geometry, mouse_event: unreal.WidgetMarkupPointerEvent,
+        self, geometry: unreal.WidgetMarkupGeometry, mouse_event: unreal.WidgetMarkupPointerEvent,
     ) -> Any:
         self.pressed = True
         if self.on_click is not None:
             self.on_click(geometry, mouse_event)
-        return unreal.WidgetLibrary.handled()
+        reply = widget_markup.WidgetLibrary.handled()
+        border = self.find_widget("CellBorder")
+        if border is not None:
+            widget_markup.WidgetLibrary.capture_mouse(reply, border)
+        return reply
 
     def on_mouse_up(
-        self, geometry: unreal.Geometry, mouse_event: unreal.WidgetMarkupPointerEvent,
+        self, geometry: unreal.WidgetMarkupGeometry, mouse_event: unreal.WidgetMarkupPointerEvent,
     ) -> Any:
         self.pressed = False
+        cursor_pos = widget_markup.WidgetLibrary.get_screen_space_position(mouse_event)
+        if not widget_markup.WidgetLibrary.is_under_location(geometry, cursor_pos):
+            reply = widget_markup.WidgetLibrary.handled()
+            widget_markup.WidgetLibrary.release_mouse_capture(reply)
+            return reply
         if self.on_release is not None:
-            return self.on_release(geometry, mouse_event)
-        return unreal.WidgetLibrary.handled()
+            self.on_release(geometry, mouse_event)
+        reply = widget_markup.WidgetLibrary.handled()
+        widget_markup.WidgetLibrary.release_mouse_capture(reply)
+        return reply

@@ -12,6 +12,8 @@ public class WidgetMarkup : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
 			"Core",
+			"InputCore",
+			"SlateCore",
 		});
 		
 		PrivateDependencyModuleNames.AddRange(new string[]
@@ -21,7 +23,6 @@ public class WidgetMarkup : ModuleRules
 			"ApplicationCore",
 			"StandaloneRenderer",
 			"Slate",
-			"SlateCore",
 			"UMG",
 			"UMGEditor",
 			"BlueprintGraph",

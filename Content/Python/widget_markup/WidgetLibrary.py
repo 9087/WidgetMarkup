@@ -46,3 +46,58 @@ class WidgetLibrary:
         return _WidgetLibrary.remove_child_widget(
             str(user_widget.get_path_name()), child
         )
+
+    # --- Event Reply helpers (mirrors UWidgetBlueprintLibrary) ---
+
+    @staticmethod
+    def handled():
+        """Return a handled FWidgetMarkupEventReply."""
+        unreal_mod = _get_unreal()
+        reply = unreal_mod.WidgetMarkupEventReply()
+        reply.set_editor_property("bIsHandled", True)
+        return reply
+
+    @staticmethod
+    def unhandled():
+        """Return an unhandled FWidgetMarkupEventReply."""
+        unreal_mod = _get_unreal()
+        return unreal_mod.WidgetMarkupEventReply()
+
+    @staticmethod
+    def capture_mouse(reply, widget):
+        """Add mouse capture to the reply (sets MouseCaptor)."""
+        reply.set_editor_property("MouseCaptor", widget)
+
+    @staticmethod
+    def release_mouse_capture(reply):
+        """Request mouse capture release."""
+        reply.set_editor_property("bReleaseMouseCapture", True)
+
+    @staticmethod
+    def lock_mouse_to_widget(reply, widget):
+        """Lock the mouse to the given widget."""
+        reply.set_editor_property("MouseLock", widget)
+
+    @staticmethod
+    def set_user_focus(reply, widget):
+        """Set keyboard focus to the given widget."""
+        reply.set_editor_property("FocusRecipient", widget)
+
+    @staticmethod
+    def set_mouse_position(reply, position):
+        """Request the cursor be moved to the given position."""
+        reply.set_editor_property("bShouldSetMousePos", True)
+        reply.set_editor_property("RequestedMousePos", position)
+
+    @staticmethod
+    def is_under_location(geometry, screen_position):
+        """Check whether screen_position is inside the geometry rect."""
+        pos = geometry.get_editor_property("AbsolutePosition")
+        size = geometry.get_editor_property("Size")
+        return (pos.x <= screen_position.x <= pos.x + size.x and
+                pos.y <= screen_position.y <= pos.y + size.y)
+
+    @staticmethod
+    def get_screen_space_position(mouse_event):
+        """Read ScreenSpacePosition from a WidgetMarkupPointerEvent."""
+        return mouse_event.get_editor_property("ScreenSpacePosition")
