@@ -153,12 +153,26 @@ FPythonAutoRelease::operator bool() const
 
 #if defined(WITH_PYTHON) && WITH_PYTHON
 FPythonGILScope::FPythonGILScope()
-	: GilState(PyGILState_Ensure())
+	: GilState(PyGILState_UNLOCKED)
+	, bAcquired(false)
 {
+	if (Py_IsInitialized())
+	{
+		GilState = PyGILState_Ensure();
+		bAcquired = true;
+	}
 }
 
 FPythonGILScope::~FPythonGILScope()
 {
-	PyGILState_Release(GilState);
+	if (bAcquired && Py_IsInitialized())
+	{
+		PyGILState_Release(GilState);
+	}
+}
+
+bool FPythonGILScope::IsAcquired() const
+{
+	return bAcquired;
 }
 #endif

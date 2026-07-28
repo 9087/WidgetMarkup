@@ -63,10 +63,13 @@ public:
 	FPythonGILScope();
 	~FPythonGILScope();
 
+	bool IsAcquired() const;
+
 	FPythonGILScope(const FPythonGILScope&) = delete;
 	FPythonGILScope& operator=(const FPythonGILScope&) = delete;
 
 private:
 	PyGILState_STATE GilState;
+	bool bAcquired;
 };
 #endif

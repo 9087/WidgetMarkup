@@ -123,7 +123,14 @@ FPythonWidgetMarkupComponent::~FPythonWidgetMarkupComponent()
 
 	#if defined(WITH_PYTHON) && WITH_PYTHON
 	FPythonGILScope GILScope;
-	Py_DECREF(reinterpret_cast<PyObject*>(PythonComponentInstance));
+	if (GILScope.IsAcquired())
+	{
+		Py_DECREF(reinterpret_cast<PyObject*>(PythonComponentInstance));
+	}
+	else
+	{
+		UE_LOG(LogWidgetMarkupPythonScripting, Verbose, TEXT("Skipping Python component DECREF because Python runtime is not available during teardown."));
+	}
 	#endif
 
 	PythonComponentInstance = nullptr;
@@ -150,6 +157,12 @@ void FPythonWidgetMarkupComponent::OnDataRefresh(UObject* Data)
 
 #if defined(WITH_PYTHON) && WITH_PYTHON
 	FPythonGILScope GILScope;
+	if (!GILScope.IsAcquired())
+	{
+		UE_LOG(LogWidgetMarkupPythonScripting, Verbose, TEXT("Skipping Python refresh call because Python runtime is not available."));
+		return;
+	}
+
 	PyObject* PyInstance = reinterpret_cast<PyObject*>(PythonComponentInstance);
 	FPythonAutoRelease PyResult(PyObject_CallMethod(PyInstance, "refresh", "O", PythonObject));
 	if (!PyResult)
