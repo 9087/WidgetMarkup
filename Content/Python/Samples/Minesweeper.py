@@ -362,6 +362,7 @@ class Minesweeper(WidgetMarkupComponent):
                     cell = self._grid[row][column]
                     if cell.is_mine and cell.state != CellState.FLAGGED:
                         cell.state = CellState.FLAGGED
+                        self.flag_count += 1
         else:
             self.status_text = "Game Over"
             for row in range(ROWS):
