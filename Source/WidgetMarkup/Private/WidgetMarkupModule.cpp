@@ -23,6 +23,7 @@
 #include "Converters/ColorConverter.h"
 #include "Converters/EnumConverter.h"
 #include "Converters/ObjectConverter.h"
+#include "Converters/SoftObjectConverter.h"
 #include "Converters/LinearColorConverter.h"
 #include "Converters/MarginConverter.h"
 #include "Converters/NameConverter.h"
@@ -33,6 +34,7 @@
 #include "Converters/TextConverter.h"
 #include "Converters/VectorConverter.h"
 #include "Converters/WidgetPropertyPathConverter.h"
+#include "Data/WidgetMarkupKeyValuePair.h"
 #include "ElementNodes/BlueprintElementNode.h"
 #include "ElementNodes/BlueprintVariableElementNode.h"
 #include "ElementNodes/PropertyChainHandle.h"
@@ -110,6 +112,7 @@ void FWidgetMarkupModule::StartupModule()
 	FElementNodeFactory::Get().Register<UBlueprint>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FBlueprintElementNode::Create));
 	FElementNodeFactory::Get().Register<UWidgetBlueprint>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FWidgetBlueprintElementNode::Create));
 	FElementNodeFactory::Get().Register<FWidgetMarkupBlueprintVariable>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FBlueprintVariableElementNode::Create), FElementNodeFactory::FRegisterOptions{FString(TEXT("Variable"))});
+	FElementNodeFactory::Get().Register<FWidgetMarkupKeyValuePair>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FStructElementNode::Create), FElementNodeFactory::FRegisterOptions{FString(TEXT("Pair"))});
 	FElementNodeFactory::Get().Register<UWidgetStyleSheet>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FStyleSheetElementNode::Create), FElementNodeFactory::FRegisterOptions{FString(TEXT("StyleSheet"))});
 	FElementNodeFactory::Get().Register<FWidgetStyleEntry>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FStyleElementNode::Create), FElementNodeFactory::FRegisterOptions{FString(TEXT("Style"))});
 	FElementNodeFactory::Get().Register<FWidgetStyleSetter>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FSetterElementNode::Create), FElementNodeFactory::FRegisterOptions{FString(TEXT("Setter"))});
@@ -142,6 +145,7 @@ void FWidgetMarkupModule::StartupModule()
 	FConverterRegistry::Get().Register(StaticStruct<FDeprecateSlateVector2D>()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(TVectorConverter<decltype(FDeprecateSlateVector2D::X), 2>::Create));
 	FConverterRegistry::Get().Register(FWidgetPropertyPath::StaticStruct()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(FWidgetPropertyPathConverter::Create));
 	FConverterRegistry::Get().Register(NAME_ObjectProperty, FConverterRegistry::FOnCreateConverter::CreateStatic(FObjectConverter::Create));
+	FConverterRegistry::Get().Register(FSoftObjectProperty::StaticClass()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(FSoftObjectConverter::Create));
 	
 	RegisterCustomPropertyRun(UObject::StaticClass(), TEXT("Name"), FOnCreatePropertyRun::CreateStatic(&FObjectNamePropertyRun::Create));
 	RegisterCustomPropertyRun(UBlueprint::StaticClass(), TEXT("Super"), FOnCreatePropertyRun::CreateStatic(&FBlueprintSuperPropertyRun::Create));
@@ -165,6 +169,7 @@ void FWidgetMarkupModule::ShutdownModule()
 	FElementNodeFactory::Get().Unregister<UWidgetBlueprint>();
 	FElementNodeFactory::Get().Unregister<UBlueprint>();
 	FElementNodeFactory::Get().Unregister<FWidgetMarkupBlueprintVariable>();
+	FElementNodeFactory::Get().Unregister<FWidgetMarkupKeyValuePair>();
 	FElementNodeFactory::Get().Unregister<UWidgetStyleSheet>();
 	FElementNodeFactory::Get().Unregister<FWidgetStyleEntry>();
 	FElementNodeFactory::Get().Unregister<FWidgetStyleSetter>();
@@ -197,6 +202,7 @@ void FWidgetMarkupModule::ShutdownModule()
 	FConverterRegistry::Get().Unregister(StaticStruct<FDeprecateSlateVector2D>()->GetFName());
 	FConverterRegistry::Get().Unregister(FWidgetPropertyPath::StaticStruct()->GetFName());
 	FConverterRegistry::Get().Unregister(NAME_ObjectProperty);
+	FConverterRegistry::Get().Unregister(FSoftObjectProperty::StaticClass()->GetFName());
 
 	UnregisterCustomPropertyRun(UObject::StaticClass(), TEXT("Name"));
 	UnregisterCustomPropertyRun(UBlueprint::StaticClass(), TEXT("Super"));

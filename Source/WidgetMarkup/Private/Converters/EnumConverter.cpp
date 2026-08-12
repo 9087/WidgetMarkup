@@ -17,19 +17,22 @@ bool FEnumConverter::Convert(const FStringView& String, UEnum* Enum, int64& OutV
 	}
 	const FString Str(String);
 	OutValue = Enum->GetValueByNameString(Str, EGetByNameFlags::CaseSensitive);
-	if (OutValue == INDEX_NONE)
-	{
-		// Fallback: match by DisplayName metadata (e.g. "Fill" → HAlign_Fill).
-		for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
-		{
-			const FString& DisplayName = Enum->GetMetaData(TEXT("DisplayName"), i);
-			if (!DisplayName.IsEmpty() && DisplayName.Equals(Str, ESearchCase::IgnoreCase))
-			{
-				OutValue = Enum->GetValueByIndex(i);
-				break;
-			}
-		}
-	}
+	// NOTE(2026-08-11): DisplayName shorthand matching is disabled so enums must
+	// use their full value name (e.g. "VAlign_Center", not "Center"). Kept
+	// commented out for reference in case shorthand matching is re-enabled later.
+	// if (OutValue == INDEX_NONE)
+	// {
+	// 	// Fallback: match by DisplayName metadata (e.g. "Fill" → HAlign_Fill).
+	// 	for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
+	// 	{
+	// 		const FString& DisplayName = Enum->GetMetaData(TEXT("DisplayName"), i);
+	// 		if (!DisplayName.IsEmpty() && DisplayName.Equals(Str, ESearchCase::IgnoreCase))
+	// 		{
+	// 			OutValue = Enum->GetValueByIndex(i);
+	// 			break;
+	// 		}
+	// 	}
+	// }
 	return OutValue != INDEX_NONE;
 }
 

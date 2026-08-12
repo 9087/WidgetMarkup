@@ -49,8 +49,28 @@ WidgetMarkup.Show /Game/WidgetMarkup/Example
 ```
 
 变量类型使用 PascalCase：`Boolean`、`Integer`、`Float`、`Double`、`String`、`Text`、`Name`。
-容器：`Array(Float)`、`Set(String)`、`Map(String,Integer)`。
 对象引用：`Object(Actor)`、`Class(Actor)`、`SoftObject(Texture2D)`。
+
+`Default` 值的字符串格式与**控件属性完全一致**（向量用逗号分隔、颜色用 `#RRGGBBAA`、枚举用枚举名等）：
+
+```xml
+<Variable Name="Scale" Type="Vector2D" Default="0.5,0.5" />
+<Variable Name="Tint" Type="LinearColor" Default="1,0.15,0.15,1" />
+<Variable Name="HAlign" Type="EHorizontalAlignment" Default="HAlign_Center" />
+```
+
+容器（`Array(Float)`、`Set(String)`、`Map(String,Integer)`）的默认值**一律使用子元素**，Map 用 `<Pair>` 表示键值对：
+
+```xml
+<Variable Name="Weights" Type="Array(Float)">
+  <Float>1.0</Float>
+  <Float>2.0</Float>
+</Variable>
+<Variable Name="Scores" Type="Map(String,Integer)">
+  <Pair Key="a" Value="1" />
+  <Pair Key="b" Value="2" />
+</Variable>
+```
 
 ### Python 组件
 

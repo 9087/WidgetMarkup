@@ -41,6 +41,9 @@ public:
 	/** Returns the buffered value, populated after Begin(). */
 	TSharedPtr<const FPropertyBuffer> GetValueBuffer() const { return ValueBuffer; }
 
+	/** Returns the raw text value (set via SetElementData). */
+	const FString& GetValueString() const { return ValueString; }
+
 private:
 	FString TypeName;                         // "float", "int", "FString", etc.
 	FString ValueString;                      // "1.0" (set via SetElementData)

@@ -71,6 +71,40 @@ Variables are defined with `<Variable>` elements. See [docs/blueprint-variables.
 | Object | `Object(Actor)`, `Class(Actor)`, `SoftObject(Texture2D)`, `SoftClass(Actor)` |
 | Enum | `ECollisionChannel` (auto-detected) |
 
+**`Default` value syntax (channel A — converter pipeline):**
+
+- Scalars / structs / enums: `Default="..."` is converted via the converter registry — e.g. `Float` → `"100.0"`, `Vector2D` → `"0.5,0.5"`, `LinearColor` → `"1,0.15,0.15,1"`, enum → **full value name** like `HAlign_Center`.
+- Objects / soft objects: `Default="/Game/Path"` (asset path).
+- **Containers (Array/Set/Map) MUST use child elements** — a `Default` attribute on a container is an error (route A).
+- A `Default` attribute combined with child elements is an error.
+
+**Container child elements** (route A — required for containers):
+
+```xml
+<Variable Name="Weights" Type="Array(Float)">
+  <Float>1.0</Float><Float>2.0</Float><Float>3.0</Float>
+</Variable>
+<Variable Name="Points" Type="Array(Vector2D)">
+  <Vector2D X="1" Y="2" /><Vector2D X="3" Y="4" />
+</Variable>
+<Variable Name="Tags" Type="Set(String)">
+  <String>red</String><String>blue</String>
+</Variable>
+<Variable Name="Scores" Type="Map(String,Integer)">
+  <Pair Key="a" Value="1" /><Pair Key="b" Value="2" />
+</Variable>
+```
+
+Scalars / structs may also use a single child element instead of `Default`:
+
+```xml
+<Variable Name="Offset" Type="Vector2D">
+  <Vector2D X="1" Y="2" />
+</Variable>
+```
+
+> **Enums: always use the full value name** (e.g. `VAlign_Center`, `HAlign_Center`). DisplayName shorthand (`Center` for `VAlign_Center`) is **disabled** — enum matching is value-name exact only.
+
 ## 2. WidgetTree & Widgets
 
 ### 2.1 Structure
@@ -89,7 +123,7 @@ The `<WidgetTree>` element is required inside `<WidgetBlueprint>`. It contains o
 
 ### 2.2 Widgets & Slots
 
-> **Any UPROPERTY on the UMG class works as an XML attribute** via `FPropertyChainHandle`, which resolves dot-separated paths through UE's reflection system. Both nested structs (e.g. `Slot.Size.SizeRule`) and object pointers (e.g. `Slot.Row`) are supported — the slot object is created by `OnAddChild` before attributes are processed.\n>\n> **Sub-property syntax:** Dot notation (`Font.Size=\"18\"`) and child-element syntax (`<Font><Size>18</Size></Font>`) both work — they go through the same `FPropertyPathResolver`. Child-element form is preferred for clarity and was validated in test files. For container properties like `ColumnFill` and `RowFill`, child-element syntax is required (these are array properties, not scalar).
+> **Any UPROPERTY on the UMG class works as an XML attribute** via `FPropertyChainHandle`, which resolves dot-separated paths through UE's reflection system. Both nested structs (e.g. `Slot.Size.SizeRule`) and object pointers (e.g. `Slot.Row`) are supported — the slot object is created by `OnAddChild` before attributes are processed.\n>\n> **Sub-property syntax:** Dot notation (`Font.Size=\"18\"`) and child-element syntax (`<Font><Size>18</Size></Font>`) both work — they go through the same `FPropertyPathResolver`. Child-element form is preferred for clarity and was validated in test files. For container properties like `ColumnFill` and `RowFill`, child-element syntax is required (these are array properties, not scalar).\n>\n> **Value vs children conflict:** A property element cannot carry both a value and child elements (e.g. `<Size>18<Child/></Size>` is a compile error). Different properties may freely mix forms — `<TextBlock Text="x"><Visibility>Visible</Visibility></TextBlock>` is fine.
 
 **[Shared base properties](docs/widgets/shared-properties.md)** — `Visibility`, `IsEnabled`, `RenderOpacity`, `RenderTransform`, `Cursor`, `ToolTipText` (all widgets).
 
@@ -228,6 +262,7 @@ Literal (non-binding) values are converted by UE's property system:
 - `"/Path/To/Class"` → UClass/UObject reference (via `StaticLoadObject`)
 - Colors: `"1,0,0,1"` → FLinearColor; use `unreal.SlateColor()` in Python bindings
 - Structs: `"0,0,100"` → FVector; `"4,4,4,4"` → FMargin
+- **Enums: use the FULL value name** (e.g. `VAlign_Center`, `HAlign_Center`; `Justification` → `Center` because `ETextJustify`'s value names ARE `Left`/`Center`/`Right`). DisplayName shorthand (`Center` for `VAlign_Center`) is **disabled** — enum matching is value-name exact only.
 
 > **ObjectProperty asset path conversion:** Properties of type `ObjectProperty` (e.g., `Brush.ResourceObject`, `Font.FontObject`) accept asset paths like `"/Game/Textures/MyIcon"` which are loaded via `StaticLoadObject`. If the path fails, and the property is `Font.FontObject` on `FSlateFontInfo`, the system falls back to loading a system font by name (e.g., `Font.FontObject='seguisym'`).
 
@@ -374,6 +409,21 @@ The `Property` supports dot-separated sub-property paths (e.g., `Font.Size`, `Pa
 | `<Setter Property="Padding.Left" Value="12" />` | Single margin component |
 | `<Setter Property="BrushColor" Value="0.12,0.12,0.14,1" />` | FLinearColor on Border |
 | `<Setter Property="FillColorAndOpacity" Value="0.1,0.8,0.3,1" />` | Fill color on ProgressBar |
+
+**Child-element form** — the value (or container entries) is provided as child elements instead of the `Value` attribute. The setter resolves the property type at compile time from the style's `TargetType` + `Property` path, and the parsed value is stored in the setter's buffer (applied via `SetValue(Buffer)` at runtime):
+
+```xml
+<!-- Single Basic element = scalar value -->
+<Setter Property="Font.Size"><Float>24</Float></Setter>
+<!-- Struct element = struct value (fields via attributes) -->
+<Setter Property="BrushColor"><LinearColor R="0.3" G="0.2" B="0.1" A="1" /></Setter>
+<!-- Multiple children = container entries (Array/Set) -->
+<Setter Property="ColumnFill"><Float>1.0</Float><Float>2.0</Float></Setter>
+```
+
+- `Value` attribute + child elements together is an **error**.
+- Container children map to container entries (Array/Set elements; Map uses `<Pair>`); a single child on a scalar/struct property is the whole value.
+- Paths that cannot be resolved at compile time (object-pointer segments like `Slot.*`, array indices, unknown targets) emit a **warning** and the child element is ignored — use the `Value` attribute for those.
 
 ### 5.5 System Fonts via Font.FontObject
 

@@ -52,6 +52,14 @@ public:
 
 	virtual UStruct* GetPropertyOwnerStruct() const override;
 
+	//~Begin FElementNode interface
+	/** Returns the element property (Array Inner / Set ElementProp) when this node wraps a container property, else nullptr. */
+	virtual FProperty* ResolveExpectedChildProperty() override;
+	//~End FElementNode interface
+
+	/** Returns the tail property of the resolved property chain (may be null). */
+	FProperty* GetTailProperty() const { return PropertyChain.IsValid() ? PropertyChain->GetTailProperty() : nullptr; }
+
 	FString GetPropertyPath() const { return PropertyPath.GetPathName().ToString(); }
 	const FString& GetPropertyName() const { return PropertyName; }
 	const FString& GetPropertyValue() const { return PropertyValue; }
@@ -74,6 +82,39 @@ protected:
 
 	TSharedPtr<IPropertyRun> GetPropertyRunInternal() const { return PropertyRun; }
 
+	/**
+	 * Dispatches one container child element to the Array/Set/Map assembly
+	 * function. Called from OnEnd() once all children have finalized their
+	 * values (struct children need their own OnEnd to have run first).
+	 * BufferedSnapshot is the value snapshot taken at OnAddChild time for
+	 * buffered property children (their buffer is released at their own OnEnd).
+	 */
+	FResult AssembleContainerElement(
+		FProperty* ContainerProperty,
+		void* ContainerValueAddress,
+		const TSharedRef<FElementNode>& Child,
+		const TSharedPtr<const FPropertyBuffer>& BufferedSnapshot);
+
+	/** Assembles one child element into an array (Object/Struct/Buffered/Basic). */
+	FResult AssembleArrayElement(
+		FArrayProperty* ArrayProperty,
+		void* ContainerValueAddress,
+		const TSharedRef<FElementNode>& Child,
+		const TSharedPtr<const FPropertyBuffer>& BufferedSnapshot);
+
+	/** Assembles one child element into a set (Object/Struct/Buffered/Basic). */
+	FResult AssembleSetElement(
+		FSetProperty* SetProperty,
+		void* ContainerValueAddress,
+		const TSharedRef<FElementNode>& Child,
+		const TSharedPtr<const FPropertyBuffer>& BufferedSnapshot);
+
+	/** Assembles one Pair child element into a map. */
+	FResult AssembleMapElement(
+		FMapProperty* MapProperty,
+		void* ContainerValueAddress,
+		const TSharedRef<FElementNode>& Child);
+
 	/** Name/path passed at construction (segment or canonical property path). */
 	FString PropertyName;
 	/** Full canonical property path from nearest object; computed in Begin(). */
@@ -91,6 +132,14 @@ protected:
 	TArray<TSharedRef<FElementNode>> ElementChildren;
 
 	TSharedPtr<IPropertyRun> PropertyRun;
+
+	/**
+	 * Value snapshots taken in OnAddChild for buffered property children,
+	 * parallel to ElementChildren (null entries for non-buffered children).
+	 * Container children are assembled in OnEnd, but buffered children release
+	 * their buffer at their own OnEnd, so we must hold a reference here.
+	 */
+	TArray<TSharedPtr<const FPropertyBuffer>> ContainerChildSnapshots;
 };
 
 template<typename TResolver>

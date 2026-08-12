@@ -49,8 +49,30 @@ WidgetMarkup.Show /Game/WidgetMarkup/Example
 ```
 
 Variable types use PascalCase: `Boolean`, `Integer`, `Float`, `Double`, `String`, `Text`, `Name`.
-Containers: `Array(Float)`, `Set(String)`, `Map(String,Integer)`.
 Object refs: `Object(Actor)`, `Class(Actor)`, `SoftObject(Texture2D)`.
+
+`Default` values use the **same string format as widget properties** (comma-separated
+vectors, `#RRGGBBAA` colors, enum names, etc.):
+
+```xml
+<Variable Name="Scale" Type="Vector2D" Default="0.5,0.5" />
+<Variable Name="Tint" Type="LinearColor" Default="1,0.15,0.15,1" />
+<Variable Name="HAlign" Type="EHorizontalAlignment" Default="HAlign_Center" />
+```
+
+Containers (`Array(Float)`, `Set(String)`, `Map(String,Integer)`) always use
+**child elements** for their defaults. Map entries use `<Pair>`:
+
+```xml
+<Variable Name="Weights" Type="Array(Float)">
+  <Float>1.0</Float>
+  <Float>2.0</Float>
+</Variable>
+<Variable Name="Scores" Type="Map(String,Integer)">
+  <Pair Key="a" Value="1" />
+  <Pair Key="b" Value="2" />
+</Variable>
+```
 
 ### Python Component
 

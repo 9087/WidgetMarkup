@@ -5,13 +5,13 @@
                  Slot.Size.SizeRule="Fill"
                  Slot.Size.Value="1.0"
                  Slot.Padding="4,2"
-                 Slot.HorizontalAlignment="Fill"
-                 Slot.VerticalAlignment="Center" />
+                 Slot.HorizontalAlignment="HAlign_Fill"
+                 Slot.VerticalAlignment="VAlign_Center" />
       <TextBlock Name="VerticalChild2" Text="Auto"
                  Slot.Size.SizeRule="Automatic"
                  Slot.Padding="8,4"
-                 Slot.HorizontalAlignment="Right"
-                 Slot.VerticalAlignment="Bottom" />
+                 Slot.HorizontalAlignment="HAlign_Right"
+                 Slot.VerticalAlignment="VAlign_Bottom" />
     </VerticalBox>
   </WidgetTree>
 </WidgetBlueprint>

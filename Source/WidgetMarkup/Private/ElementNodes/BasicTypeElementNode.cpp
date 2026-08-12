@@ -2,7 +2,7 @@
 
 #include "BasicTypeElementNode.h"
 #include "ElementNodes/PropertyElementNode.h"
-#include "ElementNodes/PropertyChainHandle.h"
+#include "ElementNodes/SetterElementNode.h"
 #include "PropertyBuffer.h"
 #include "UObject/UnrealType.h"
 
@@ -23,28 +23,51 @@ void FBasicTypeElementNode::SetElementData(const TCHAR* InElementData)
 
 FElementNode::FResult FBasicTypeElementNode::OnBegin(const FContext& Context, UObject* Outer, UStruct* /*Struct*/)
 {
-	UObject* Object = Context.GetLastObjectNode() ? Context.GetLastObjectNode()->GetObject() : nullptr;
-	if (!Object)
+	// The parent node supplies the expected element property:
+	// - FPropertyElementNode (array/set property chain, e.g. ColumnFill) returns
+	//   the container's element property (Inner / ElementProp).
+	// - FBlueprintVariableElementNode (Variable container) returns its synthesized
+	//   inner property.
+	FProperty* TailProperty = nullptr;
+	TSharedPtr<FElementNode> Parent = Context.GetLastNode();
+	if (Parent.IsValid())
 	{
-		return FResult::Failure().Error(FText::FromString(TEXT("BasicTypeElementNode: no object in context.")));
+		TailProperty = Parent->ResolveExpectedChildProperty();
+		if (!TailProperty)
+		{
+			// The parent could not provide an element type. A Map property needs
+			// Pair children, and any other property node is neither an Array nor
+			// a Set, so it cannot host bare basic-type elements.
+			if (auto PropertyParent = CastElementNode<FPropertyElementNode>(Parent.Get()))
+			{
+				if (FProperty* ParentTail = PropertyParent->GetTailProperty())
+				{
+					if (CastField<FMapProperty>(ParentTail))
+					{
+						return FResult::Failure().Error(FText::Format(
+							FText::FromString(TEXT("BasicTypeElementNode: parent is a map property, use pair child elements for '{0}'.")),
+							FText::FromString(TypeName)));
+					}
+				}
+				return FResult::Failure().Error(FText::Format(
+					FText::FromString(TEXT("BasicTypeElementNode: parent is not an array or set property for '{0}'.")),
+					FText::FromString(TypeName)));
+			}
+		}
 	}
-
-	FWidgetPropertyPath ResolvedPath;
-	FBufferedPropertyContext DummyBuffered;
-	if (!FPropertyElementNode::TryResolveArrayElementPath(Context, INDEX_NONE, ResolvedPath, DummyBuffered))
-	{
-		return FResult::Failure().Error(FText::Format(
-			FText::FromString(TEXT("BasicTypeElementNode: parent is not an array property.")),
-			FText::FromString(TypeName)));
-	}
-
-	TSharedPtr<FPropertyChainHandle> Chain = FPropertyChainHandle::Create(Object, ResolvedPath);
-	FProperty* TailProperty = Chain.IsValid() ? Chain->GetTailProperty() : nullptr;
 	if (!TailProperty)
 	{
+		// A Setter parent with an unresolvable path (object-pointer segment such
+		// as Slot.*, array index, or unknown property) decides in its own OnEnd:
+		// it warns and ignores the child element. Let the Setter handle it
+		// instead of aborting here.
+		if (Parent.IsValid() && CastElementNode<FSetterElementNode>(Parent.Get()))
+		{
+			return FResult::Success();
+		}
 		return FResult::Failure().Error(FText::Format(
-			FText::FromString(TEXT("BasicTypeElementNode: cannot resolve tail property for path '{0}'.")),
-			FText::FromString(ResolvedPath.GetPathName().ToString())));
+			FText::FromString(TEXT("BasicTypeElementNode: cannot resolve element property for '{0}'.")),
+			FText::FromString(TypeName)));
 	}
 
 	ValueBuffer = MakeShared<FPropertyBuffer>(TailProperty, FStringView(ValueString));

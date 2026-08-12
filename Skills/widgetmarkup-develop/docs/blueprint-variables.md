@@ -60,42 +60,34 @@ Struct names omit the `F` prefix. Case-sensitive exact match. `Vector` → `FVec
 
 ## Containers
 
-Container types use **parentheses** for inner type parameters. Two forms for defaults:
-
-1. **String form** (basic-type containers only): `Default="value1,value2,..."`
-2. **Child element form**: element name = inner type in PascalCase
+Container types use **parentheses** for inner type parameters. **Children-only** — a string `Default` attribute on a container is rejected (route A):
 
 ```xml
-<!-- String form: basic-type containers -->
-<Variable Name="Scores" Type="Array(Float)" Default="1.5,2.0,3.5" />
-<Variable Name="Names" Type="Set(String)" Default="Alice,Bob" />
-
-<!-- Element form: any container type -->
 <Variable Name="Ids" Type="Array(Integer)">
   <Integer>42</Integer>
   <Integer>99</Integer>
 </Variable>
-<Variable Name="Flags" Type="Array(Boolean)">
-  <Boolean>True</Boolean>
-  <Boolean>False</Boolean>
+<Variable Name="Weights" Type="Array(Float)">
+  <Float>1.0</Float><Float>2.0</Float>
 </Variable>
-<Variable Name="Points" Type="Array(Vector)">
-  <Vector>0,0,0</Vector>
-  <Vector>100,200,300</Vector>
+<Variable Name="Points" Type="Array(Vector2D)">
+  <Vector2D X="1" Y="2" /><Vector2D X="3" Y="4" />
 </Variable>
-<Variable Name="Actors" Type="Array(Object(Actor))">
-  <Actor Name="A" />
-  <Actor Name="B" />
+<Variable Name="Tags" Type="Set(String)">
+  <String>red</String><String>blue</String>
+</Variable>
+<Variable Name="Scores" Type="Map(String,Integer)">
+  <Pair Key="a" Value="1" /><Pair Key="b" Value="2" />
 </Variable>
 ```
 
-> **Constraint:** Struct/object inner types MUST use child elements; string `Default` is rejected for non-basic inner types.
+Child elements are the inner type in PascalCase (Basic / Struct / Object). Map uses `<Pair Key=".." Value=".."/>` children.
 
 | Type | Syntax | Notes |
 |---|---|---|
-| `Array(InnerType)` | `Array(Integer)` | String or children |
-| `Set(InnerType)` | `Set(String)` | String or children |
-| `Map(KeyType,ValueType)` | `Map(String,Integer)` | Children only |
+| `Array(InnerType)` | `Array(Integer)` | Children only |
+| `Set(InnerType)` | `Set(String)` | Children only |
+| `Map(KeyType,ValueType)` | `Map(String,Integer)` | `<Pair>` children |
 
 ## Object references
 
@@ -117,5 +109,7 @@ Enums are auto-detected — no prefix needed. The `E` prefix is auto-added.
 | Type | Example |
 |---|---|
 | `ECollisionChannel` | `"ECC_WorldStatic"` |
+
+> **Use the full value name** (e.g. `ECC_WorldStatic`, `HAlign_Center`). DisplayName shorthand is **disabled** — enum matching is value-name exact only.
 
 > **Literal braces in Default:** The `Default` attribute treats `{}` as literal text, not a binding expression. Use normal `"value"` syntax for strings containing braces — the binding-expression detection is suppressed for `<Variable Default="...">`.

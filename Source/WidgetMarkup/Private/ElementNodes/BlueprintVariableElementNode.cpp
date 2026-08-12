@@ -3,13 +3,17 @@
 #include "BlueprintVariableElementNode.h"
 
 #include "BasicTypeElementNode.h"
+#include "ConverterRegistry.h"
 #include "ObjectElementNode.h"
 #include "PropertyBuffer.h"
 #include "StructElementNode.h"
 #include "WidgetMarkupBlueprintVariable.h"
+#include "Data/WidgetMarkupKeyValuePair.h"
+#include "../Utilities/PropertyValueAssembler.h"
 #include "../Utilities/TypeParser.h"
 #include "Engine/Blueprint.h"
 #include "Kismet2/BlueprintEditorUtils.h"
+#include "UObject/UnrealType.h"
 
 IMPLEMENT_ELEMENT_NODE(FBlueprintVariableElementNode, FStructElementNode)
 
@@ -34,6 +38,140 @@ FElementNode::FResult FBlueprintVariableElementNode::OnBegin(const FContext& Con
 	return FResult::Success();
 }
 
+bool FBlueprintVariableElementNode::EnsureTypeParsed()
+{
+	if (bTypeParsed || !TypeParseError.IsEmpty())
+	{
+		return bTypeParsed;
+	}
+
+	const auto* VariableData = static_cast<const FWidgetMarkupBlueprintVariable*>(GetStructMemory());
+	if (!VariableData)
+	{
+		TypeParseError = TEXT("Variable element has no struct data.");
+		return false;
+	}
+
+	const FString VariableType = VariableData->Type.TrimStartAndEnd();
+	if (VariableType.IsEmpty())
+	{
+		TypeParseError = TEXT("Variable element requires a non-empty Type attribute.");
+		return false;
+	}
+	if (!FTypeParser::ParseType(VariableType, CachedPinType, TypeParseError))
+	{
+		return false;
+	}
+
+	FString FactoryError;
+	FProperty* SyntheticProperty = TypeFactory.CreateProperty(CachedPinType, FactoryError);
+	if (!SyntheticProperty)
+	{
+		TypeParseError = FactoryError;
+		return false;
+	}
+
+	DefaultBuffer.SetProperty(SyntheticProperty);
+	if (!DefaultBuffer.HasValue())
+	{
+		TypeParseError = TEXT("Failed to allocate default value memory.");
+		return false;
+	}
+
+	bTypeParsed = true;
+	return true;
+}
+
+FProperty* FBlueprintVariableElementNode::ResolveExpectedChildProperty()
+{
+	if (!EnsureTypeParsed())
+	{
+		return nullptr;
+	}
+
+	FProperty* Property = DefaultBuffer.GetProperty();
+	if (FArrayProperty* ArrayProperty = CastField<FArrayProperty>(Property))
+	{
+		return ArrayProperty->Inner;
+	}
+	if (FSetProperty* SetProperty = CastField<FSetProperty>(Property))
+	{
+		return SetProperty->ElementProp;
+	}
+	if (FMapProperty* MapProperty = CastField<FMapProperty>(Property))
+	{
+		// Map elements must be Pair elements; a bare basic-type child has no key/value split.
+		return nullptr;
+	}
+	return Property;
+}
+
+FElementNode::FResult FBlueprintVariableElementNode::OnAddChild(const TSharedRef<FElementNode>& Child)
+{
+	if (!EnsureTypeParsed())
+	{
+		return FResult::Failure().Error(FText::FromString(TypeParseError));
+	}
+
+	FResult ValidationResult = ValidateChild(Child);
+	if (!ValidationResult)
+	{
+		return ValidationResult;
+	}
+
+	DefaultValueChildren.Add(Child);
+	return FResult::Success();
+}
+
+FElementNode::FResult FBlueprintVariableElementNode::ValidateChild(const TSharedRef<FElementNode>& Child)
+{
+	const bool bIsBasic = CastElementNode<FBasicTypeElementNode>(TSharedPtr<FElementNode>(Child)) != nullptr;
+	const bool bIsObject = CastElementNode<FObjectElementNode>(TSharedPtr<FElementNode>(Child)) != nullptr;
+	auto StructChild = CastElementNode<FStructElementNode>(TSharedPtr<FElementNode>(Child));
+	const bool bIsPair = StructChild.IsValid() && StructChild->GetScriptStruct() == FWidgetMarkupKeyValuePair::StaticStruct();
+	const bool bIsStruct = StructChild.IsValid() && !bIsPair;
+
+	FProperty* Property = DefaultBuffer.GetProperty();
+
+	if (CastField<FArrayProperty>(Property) || CastField<FSetProperty>(Property))
+	{
+		if (!bIsBasic && !bIsStruct && !bIsObject)
+		{
+			return FResult::Failure().Error(FText::FromString(
+				TEXT("Variable: container children must be basic-type, struct, or object elements (Pair is only valid in Map).")));
+		}
+		return FResult::Success();
+	}
+
+	if (CastField<FMapProperty>(Property))
+	{
+		if (!bIsPair)
+		{
+			return FResult::Failure().Error(FText::FromString(
+				TEXT("Variable: Map children must be Pair elements.")));
+		}
+		return FResult::Success();
+	}
+
+	// Non-container: at most one child, and it cannot be a Pair.
+	if (DefaultValueChildren.Num() > 0)
+	{
+		return FResult::Failure().Error(FText::FromString(
+			TEXT("Variable: only one child element is allowed for a non-container variable.")));
+	}
+	if (bIsPair)
+	{
+		return FResult::Failure().Error(FText::FromString(
+			TEXT("Variable: Pair child elements are only valid in Map variables.")));
+	}
+	if (!bIsBasic && !bIsStruct && !bIsObject)
+	{
+		return FResult::Failure().Error(FText::FromString(
+			TEXT("Variable: unsupported child element for this variable type.")));
+	}
+	return FResult::Success();
+}
+
 FElementNode::FResult FBlueprintVariableElementNode::OnEnd()
 {
 	UBlueprint* ParentBlueprintObject = ParentBlueprint.Get();
@@ -50,8 +188,6 @@ FElementNode::FResult FBlueprintVariableElementNode::OnEnd()
 
 	const FString VariableName = VariableData->Name.TrimStartAndEnd();
 	const FString VariableType = VariableData->Type.TrimStartAndEnd();
-	FString VariableDefaultValue = VariableData->Default;
-
 	if (VariableName.IsEmpty())
 	{
 		return FResult::Failure().Error(FText::FromString(TEXT("Variable element requires a non-empty Name attribute.")));
@@ -61,103 +197,79 @@ FElementNode::FResult FBlueprintVariableElementNode::OnEnd()
 		return FResult::Failure().Error(FText::FromString(TEXT("Variable element requires a non-empty Type attribute.")));
 	}
 
-	// Parse container type info for validation.
-	FString ContainerName, InnerTypeText, ParseError;
-	const bool bIsContainer = FTypeParser::ParseContainer(VariableType, ContainerName, InnerTypeText, ParseError);
-	const bool bIsBasicType = bIsContainer && FTypeParser::ToPinCategory(InnerTypeText) != NAME_None;
-	const bool bIsStructType = bIsContainer && !bIsBasicType;
+	if (!EnsureTypeParsed())
+	{
+		return FResult::Failure().Error(FText::FromString(TypeParseError));
+	}
 
-	// Ban string Default for container types with non-basic inner types
-	// (e.g. Array<MyDataAsset>).  They MUST use child elements.
-	if (bIsStructType && !VariableDefaultValue.IsEmpty())
+	FProperty* SyntheticProperty = DefaultBuffer.GetProperty();
+	const bool bIsContainer = SyntheticProperty->IsA<FArrayProperty>()
+		|| SyntheticProperty->IsA<FSetProperty>()
+		|| SyntheticProperty->IsA<FMapProperty>();
+
+	const FString VariableDefaultValue = VariableData->Default;
+	const bool bHasStringDefault = !VariableDefaultValue.IsEmpty();
+	const bool bHasChildren = DefaultValueChildren.Num() > 0;
+	if (bHasStringDefault && bHasChildren)
 	{
 		return FResult::Failure().Error(FText::Format(
-			FText::FromString(TEXT("Variable '{0}' is a container of non-basic type. Use child elements instead of the Default attribute.")),
+			FText::FromString(TEXT("Variable '{0}': Default attribute conflicts with child elements.")),
+			FText::FromString(VariableName)));
+	}
+	if (bHasStringDefault && bIsContainer)
+	{
+		// Route A: containers must use child elements.
+		return FResult::Failure().Error(FText::Format(
+			FText::FromString(TEXT("Variable '{0}' is a container type. Use child elements instead of the Default attribute.")),
 			FText::FromString(VariableName)));
 	}
 
-	// Collect child element values.
-	if (DefaultValueChildren.Num() > 0)
+	// Channel A: convert the Default string via the converter registry (non-container only).
+	if (bHasStringDefault)
 	{
-		TArray<FString> ChildValues;
-		for (const TSharedRef<FElementNode>& Child : DefaultValueChildren)
-		{
-			FString ExportedValue;
-
-			if (auto BasicNode = CastElementNode<FBasicTypeElementNode>(TSharedPtr<FElementNode>(Child)))
-			{
-				const TSharedPtr<const FPropertyBuffer> Buffer = BasicNode->GetValueBuffer();
-				if (!Buffer.IsValid() || !Buffer->GetValueData())
-				{
-					return FResult::Failure().Error(FText::Format(
-						FText::FromString(TEXT("Variable '{0}': child element has no value.")),
-						FText::FromString(VariableName)));
-				}
-				Buffer->GetProperty()->ExportTextItem_Direct(ExportedValue, Buffer->GetValueData(), nullptr, nullptr, PPF_None);
-			}
-			else if (auto StructNode = CastElementNode<FStructElementNode>(TSharedPtr<FElementNode>(Child)))
-			{
-				UScriptStruct* StructType = StructNode->GetScriptStruct();
-				void* StructMemory = StructNode->GetStructMemory();
-				if (!StructType || !StructMemory)
-				{
-					return FResult::Failure().Error(FText::Format(
-						FText::FromString(TEXT("Variable '{0}': struct child element has no data.")),
-						FText::FromString(VariableName)));
-				}
-				StructType->ExportText(ExportedValue, StructMemory, nullptr, nullptr, PPF_None, nullptr);
-			}
-			else if (auto ObjectNode = CastElementNode<FObjectElementNode>(TSharedPtr<FElementNode>(Child)))
-			{
-				if (ObjectNode->IsPathReference())
-				{
-					ExportedValue = ObjectNode->GetObjectPath();
-				}
-				else
-				{
-					UObject* Object = ObjectNode->GetObject();
-					if (!Object)
-					{
-						return FResult::Failure().Error(FText::Format(
-							FText::FromString(TEXT("Variable '{0}': inline object child element has no object.")),
-							FText::FromString(VariableName)));
-					}
-					// FObjectPropertyBase::ExportTextItem_Direct ≡ GetPathName().
-					// These are semantically identical for object-type default values.
-					Object->GetPathName(nullptr, ExportedValue);
-				}
-			}
-
-			ChildValues.Add(ExportedValue);
-		}
-
-		const FString ChildDefault = FString::Join(ChildValues, TEXT(","));
-		// Container types (Array/Set/Map) require parenthesized default values:
-		//   Array: (Item1,Item2)  Set: (Item1,Item2)  Map: ((K1,V1),(K2,V2))
-		const FString FormattedDefault = bIsContainer
-			? FString::Printf(TEXT("(%s)"), *ChildDefault)
-			: ChildDefault;
-		if (!VariableDefaultValue.IsEmpty() && VariableDefaultValue != FormattedDefault)
+		if (!FConverterRegistry::Get().Convert(*SyntheticProperty, DefaultBuffer.GetValueData(), VariableDefaultValue))
 		{
 			return FResult::Failure().Error(FText::Format(
-				FText::FromString(TEXT("Variable '{0}': Default attribute conflicts with child elements.")),
-				FText::FromString(VariableName)));
+				FText::FromString(TEXT("Variable '{0}': failed to convert default value '{1}' to type '{2}'.")),
+				FText::FromString(VariableName),
+				FText::FromString(VariableDefaultValue),
+				FText::FromString(VariableType)));
 		}
-		VariableDefaultValue = FormattedDefault;
+	}
+	else if (bHasChildren)
+	{
+		// Assemble child values into the typed default buffer (shared assembler).
+		if (bIsContainer)
+		{
+			for (const TSharedRef<FElementNode>& Child : DefaultValueChildren)
+			{
+				FResult ChildResult = FPropertyValueAssembler::AppendChildToContainer(SyntheticProperty, DefaultBuffer, Child);
+				if (!ChildResult)
+				{
+					return ChildResult;
+				}
+			}
+		}
+		else
+		{
+			FResult ScalarResult = CopyScalarChild(SyntheticProperty, DefaultValueChildren[0]);
+			if (!ScalarResult)
+			{
+				return ScalarResult;
+			}
+		}
 	}
 
-	FEdGraphPinType PinType;
-	FString PinTypeParseError;
-	if (!FTypeParser::ParseType(VariableType, PinType, PinTypeParseError))
+	// Export the typed default back to UE's property text format for AddMemberVariable.
+	FString ExportedDefault;
+	if (!DefaultBuffer.ExportValueText(ExportedDefault))
 	{
 		return FResult::Failure().Error(FText::Format(
-			FText::FromString(TEXT("Variable '{0}' has invalid Type '{1}': {2}")),
-			FText::FromString(VariableName),
-			FText::FromString(VariableType),
-			FText::FromString(PinTypeParseError)));
+			FText::FromString(TEXT("Variable '{0}': failed to export default value.")),
+			FText::FromString(VariableName)));
 	}
 
-	if (!FBlueprintEditorUtils::AddMemberVariable(ParentBlueprintObject, FName(VariableName), PinType, VariableDefaultValue))
+	if (!FBlueprintEditorUtils::AddMemberVariable(ParentBlueprintObject, FName(VariableName), CachedPinType, ExportedDefault))
 	{
 		return FResult::Failure().Error(FText::Format(
 			FText::FromString(TEXT("Failed to add variable '{0}' to Blueprint '{1}'. Variable name may conflict with existing member or parent class.")),
@@ -168,14 +280,7 @@ FElementNode::FResult FBlueprintVariableElementNode::OnEnd()
 	return FStructElementNode::OnEnd();
 }
 
-FElementNode::FResult FBlueprintVariableElementNode::OnAddChild(const TSharedRef<FElementNode>& Child)
+FElementNode::FResult FBlueprintVariableElementNode::CopyScalarChild(FProperty* Property, const TSharedRef<FElementNode>& Child)
 {
-	if (CastElementNode<FBasicTypeElementNode>(TSharedPtr<FElementNode>(Child))
-		|| CastElementNode<FStructElementNode>(TSharedPtr<FElementNode>(Child))
-		|| CastElementNode<FObjectElementNode>(TSharedPtr<FElementNode>(Child)))
-	{
-		DefaultValueChildren.Add(Child);
-		return FResult::Success();
-	}
-	return FResult::Failure().Error(FText::FromString(TEXT("Variable child elements must be basic-type literals, structs, or objects.")));
+	return FPropertyValueAssembler::CopyChildIntoBuffer(Property, DefaultBuffer, Child);
 }

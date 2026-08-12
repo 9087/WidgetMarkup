@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0..\..\..\..\.."
 set "APP=Game\Binaries\Win64\WidgetMarkupApp.exe"
-set "EXTRA_ARGS=--extra-arguments test"
+set "EXTRA_ARGS=--extra-arguments "test -nullrhi""
 set "UPROJECT=%~1"
 if "%UPROJECT%"=="" set "UPROJECT=%CD%\Game\Game.uproject"
 
@@ -10,86 +10,75 @@ echo ========================================
 echo WidgetMarkup Test Suite
 echo ========================================
 
+:: Count the tests automatically from the "call :run_test" lines below, so the
+:: [n/total] numbering never needs manual updating when tests are added/removed.
+:: /b restricts the match to lines that START with "call :run_test" so comments
+:: and this very findstr command (which also contain the text) are not counted.
+set /a TOTAL=0
+for /f "delims=" %%A in ('findstr /b /c:"call :run_test" /c:"call :run_negative_test" "%~f0"') do set /a TOTAL+=1
 set /a COUNT=0
 
-echo [1/17] Empty widgetmarkup...
-"%APP%" /WidgetMarkup/Tests/TestEmpty --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [2/17] Reactive properties...
-"%APP%" /WidgetMarkup/Tests/TestReactive --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [3/17] Computed properties...
-"%APP%" /WidgetMarkup/Tests/TestComputed --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [4/17] TextBlock widget...
-"%APP%" /WidgetMarkup/Tests/TestTextBlock --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [5/17] Button widget...
-"%APP%" /WidgetMarkup/Tests/TestButton --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [6/17] Image widget...
-"%APP%" /WidgetMarkup/Tests/TestImage --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [7/17] Border widget (single-child container)...
-"%APP%" /WidgetMarkup/Tests/TestBorder --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [8/17] CanvasPanel widget...
-"%APP%" /WidgetMarkup/Tests/TestCanvasPanel --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [9/17] HorizontalBox widget...
-"%APP%" /WidgetMarkup/Tests/TestHorizontalBox --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [10/17] VerticalBox widget...
-"%APP%" /WidgetMarkup/Tests/TestVerticalBox --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [11/17] Overlay widget...
-"%APP%" /WidgetMarkup/Tests/TestOverlay --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [12/17] StyleSheet (inline)...
-"%APP%" /WidgetMarkup/Tests/TestStyleSheetInline --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [13/17] StyleSheet (inherit standalone file + override)...
-"%APP%" /WidgetMarkup/Tests/TestStyleSheetOverride --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [14/17] ListView + ObservableCollection...
-"%APP%" /WidgetMarkup/Tests/TestListView --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [15/17] Dynamic add_child / remove_child / get_child...
-"%APP%" /WidgetMarkup/Tests/TestDynamicChild --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [16/17] Static child widget blueprint + get_child / remove_child...
-"%APP%" /WidgetMarkup/Tests/TestStaticChild --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
-
-echo [17/17] Variable element (defaults, types, brace literals)...
-"%APP%" /WidgetMarkup/Tests/TestVariable --project "%UPROJECT%" %EXTRA_ARGS%
-if %errorlevel% neq 0 goto :fail
+call :run_test "TestEmpty" "Empty widgetmarkup"
+call :run_test "TestReactive" "Reactive properties"
+call :run_test "TestComputed" "Computed properties"
+call :run_test "TestTextBlock" "TextBlock widget"
+call :run_test "TestButton" "Button widget"
+call :run_test "TestImage" "Image widget"
+call :run_test "TestBorder" "Border widget (single-child container)"
+call :run_test "TestCanvasPanel" "CanvasPanel widget"
+call :run_test "TestHorizontalBox" "HorizontalBox widget"
+call :run_test "TestVerticalBox" "VerticalBox widget"
+call :run_test "TestGridPanel" "GridPanel widget (ColumnFill/RowFill containers)"
+call :run_test "TestOverlay" "Overlay widget"
+call :run_test "TestStyleSheetInline" "StyleSheet (inline)"
+call :run_test "TestStyleSheetOverride" "StyleSheet (inherit standalone file + override)"
+call :run_test "TestListView" "ListView + ObservableCollection"
+call :run_test "TestDynamicChild" "Dynamic add_child / remove_child / get_child"
+call :run_test "TestStaticChild" "Static child widget blueprint + get_child / remove_child"
+call :run_test "TestVariable" "Variable element (defaults, types, brace literals)"
+call :run_negative_test "TestConflict" "Property value+children conflict (expected compile failure)"
 
 echo.
 echo ========================================
 echo All tests passed.
 echo ========================================
-goto :end
+exit /b 0
 
-:fail
+:run_test
+set /a COUNT+=1
+echo [%COUNT%/%TOTAL%] %~2...
+"%APP%" /WidgetMarkup/Tests/%~1 --project "%UPROJECT%" %EXTRA_ARGS%
+if errorlevel 1 (
+    echo.
+    echo ========================================
+    echo TESTS FAILED
+    echo ========================================
+    exit /b 1
+)
+exit /b 0
+
+:run_negative_test
+set /a COUNT+=1
+echo [%COUNT%/%TOTAL%] %~2...
+:: A negative test is EXPECTED to fail compilation. A compile failure means the
+:: app never shuts down on its own, so run it in the background, wait, kill it,
+:: then assert the log shows a compile failure and no passing Python checks.
+set "TESTLOG=%CD%\Game\Saved\Logs\WidgetMarkupApp.log"
+if exist "%TESTLOG%" del /f /q "%TESTLOG%"
+start "" /b "%APP%" /WidgetMarkup/Tests/%~1 --project "%UPROJECT%" --extra-arguments "test -nullrhi -log" >nul 2>&1
+timeout /t 30 /nobreak >nul
+taskkill /F /IM WidgetMarkupApp.exe >nul 2>&1
+
+findstr /c:"CompileFromSourceCode failed" "%TESTLOG%" >nul 2>&1
+if errorlevel 1 goto :negative_fail
+findstr /c:"ALL CHECKS PASSED" "%TESTLOG%" >nul 2>&1
+if not errorlevel 1 goto :negative_fail
+echo [PASS] %~2 (expected compile failure)
+exit /b 0
+
+:negative_fail
 echo.
 echo ========================================
-echo TESTS FAILED
+echo TESTS FAILED (negative test %~1 did not fail as expected)
 echo ========================================
-
-:end
+exit /b 1

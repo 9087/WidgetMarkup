@@ -6,9 +6,15 @@
 #include "UObject/UnrealType.h"
 #include "WidgetMarkupModule.h"
 
-TSharedPtr<FPropertyPathResolver::FOutput> FPropertyPathResolver::TryResolvePath(const FInitialState& InitialState, const FWidgetPropertyPath& Path)
+TSharedPtr<FPropertyPathResolver::FOutput> FPropertyPathResolver::TryResolvePath(const FInitialState& InitialState, const FWidgetPropertyPath& Path, bool bTypeOnly)
 {
-	if (!InitialState.Container || Path.IsEmpty())
+	if (Path.IsEmpty() || !InitialState.Struct)
+	{
+		return nullptr;
+	}
+	// Type-only mode allows a null container (compile-time resolution without an
+	// instance); the full mode requires a container to compute value addresses.
+	if (!bTypeOnly && !InitialState.Container)
 	{
 		return nullptr;
 	}
@@ -86,6 +92,12 @@ TSharedPtr<FPropertyPathResolver::FOutput> FPropertyPathResolver::TryResolvePath
 				return nullptr;
 			}
 
+			if (bTypeOnly && Element.ArrayIndex != INDEX_NONE)
+			{
+				// Without a container, a specific array element cannot be resolved.
+				return nullptr;
+			}
+
 			FScriptArrayHelper ArrayHelper(ArrayProperty, CurrentContainer);
 			if (Element.ArrayIndex == INDEX_NONE)
 			{
@@ -148,6 +160,12 @@ TSharedPtr<FPropertyPathResolver::FOutput> FPropertyPathResolver::TryResolvePath
 		}
 		else if (FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(CurrentProperty))
 		{
+			if (bTypeOnly)
+			{
+				// Without an instance, the concrete object subclass (and therefore
+				// any further path segment) cannot be resolved.
+				return nullptr;
+			}
 			UObject* ObjectValue = ObjectProperty->GetObjectPropertyValue(ValueAddress);
 			if (!ObjectValue)
 			{

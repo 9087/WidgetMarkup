@@ -10,6 +10,27 @@
 #include "Extensions/WidgetMarkupBlueprintGeneratedClassExtension.h"
 #include "Utilities/TypeParser.h"
 
+void UWidgetStyleSheet::AddReferencedObjects(UObject* InThis, FReferenceCollector& Collector)
+{
+	UWidgetStyleSheet* This = CastChecked<UWidgetStyleSheet>(InThis);
+	Super::AddReferencedObjects(InThis, Collector);
+
+	const auto CollectSetterBuffers = [&Collector](TArray<FWidgetStyleEntry>& Entries)
+	{
+		for (FWidgetStyleEntry& Entry : Entries)
+		{
+			for (FWidgetStyleSetter& Setter : Entry.Setters)
+			{
+				// FPropertyBuffer holds a raw allocation whose object references are not visible to the GC otherwise.
+				Setter.Buffer.AddStructReferencedObjects(Collector);
+			}
+		}
+	};
+
+	CollectSetterBuffers(This->Styles);
+	CollectSetterBuffers(This->ComputedStyles);
+}
+
 bool FWidgetStyleSetter::ApplyToWidget(UWidget* Widget) const
 {
 	if (!Widget || Property.IsEmpty()) return false;

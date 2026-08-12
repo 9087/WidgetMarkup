@@ -2,12 +2,39 @@
   <StyleSheet>
     <Style TargetType="TextBlock" Name="InlineStyled">
       <Setter Property="ColorAndOpacity" Value="#00FF00FF" />
-      <Setter Property="Font.Size" Value="18" />
+      <!-- Child-element form: Font.Size via a Basic element -->
+      <Setter Property="Font.Size">
+        <Float>24</Float>
+      </Setter>
+    </Style>
+    <Style TargetType="Border" Name="Card">
+      <!-- Child-element form: BrushColor via a struct element -->
+      <Setter Property="BrushColor">
+        <LinearColor R="0.3" G="0.2" B="0.1" A="1" />
+      </Setter>
+    </Style>
+    <Style TargetType="GridPanel" Name="Cols">
+      <!-- Container child elements: ColumnFill array via multiple Float children -->
+      <Setter Property="ColumnFill">
+        <Float>1.0</Float>
+        <Float>2.0</Float>
+      </Setter>
+    </Style>
+    <Style TargetType="TextBlock" Name="SlotStyled">
+      <!-- Slot.* goes through an object pointer, unresolvable at compile time -> warning + setter ignored -->
+      <Setter Property="Slot.Padding">
+        <Float>8</Float>
+      </Setter>
     </Style>
   </StyleSheet>
   <WidgetTree>
     <CanvasPanel>
       <TextBlock Name="InlineStyled" Style="InlineStyled" Text="inline styled text" />
+      <Border Name="CardBorder" Style="Card">
+        <TextBlock Text="card" />
+      </Border>
+      <GridPanel Name="StyledGrid" Style="Cols" />
+      <TextBlock Name="SlotStyled" Style="SlotStyled" Text="slot styled text" />
     </CanvasPanel>
   </WidgetTree>
 </WidgetBlueprint>

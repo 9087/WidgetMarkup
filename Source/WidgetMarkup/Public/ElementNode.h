@@ -8,6 +8,8 @@
 #include <type_traits>
 #include <utility>
 
+class FProperty;
+
 /** Lightweight type descriptor for FElementNode hierarchy. Used for IsA/Cast without RTTI. */
 struct FElementNodeClass
 {
@@ -52,6 +54,13 @@ public:
 
 	virtual UObject* GetObject() const { return nullptr; }
 	virtual UStruct* GetPropertyOwnerStruct() const { return nullptr; }
+
+	/**
+	 * Returns the property a child element should be interpreted as, when the
+	 * parent cannot provide a real property chain (e.g. Variable container
+	 * elements). nullptr means the child must resolve its own type.
+	 */
+	virtual FProperty* ResolveExpectedChildProperty() { return nullptr; }
 
 	enum class EMessageType
 	{

@@ -1,0 +1,18 @@
+<WidgetBlueprint Script="Tests.TestGridPanel">
+  <WidgetTree>
+    <GridPanel Name="TestGrid" Visibility="Visible">
+      <!-- Container properties on the panel itself use child-element syntax -->
+      <ColumnFill>
+        <Float>1.0</Float>
+        <Float>2.0</Float>
+        <Float>1.0</Float>
+      </ColumnFill>
+      <RowFill>
+        <Float>1.0</Float>
+        <Float>1.0</Float>
+      </RowFill>
+      <TextBlock Name="GridChild0" Text="(0,0)" Slot.Row="0" Slot.Column="0" />
+      <TextBlock Name="GridChild1" Text="(0,1)" Slot.Row="0" Slot.Column="1" />
+    </GridPanel>
+  </WidgetTree>
+</WidgetBlueprint>

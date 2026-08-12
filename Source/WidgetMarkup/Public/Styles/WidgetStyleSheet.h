@@ -72,4 +72,8 @@ public:
 
 	/** Apply ComputedStyles to the given UserWidget using the provided style assignments. */
 	void ApplyToUserWidget(UUserWidget* UserWidget) const;
+
+	//~Begin UObject interface
+	static void AddReferencedObjects(UObject* InThis, FReferenceCollector& Collector);
+	//~End UObject interface
 };

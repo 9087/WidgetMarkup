@@ -61,8 +61,8 @@ FName FTypeParser::ToPinCategory(const FString& TypeToken)
 	if (TypeToken.Equals(TEXT("Boolean"))) return UEdGraphSchema_K2::PC_Boolean;
 	if (TypeToken.Equals(TEXT("Integer"))) return UEdGraphSchema_K2::PC_Int;
 	if (TypeToken.Equals(TEXT("Integer64"))) return UEdGraphSchema_K2::PC_Int64;
-	if (TypeToken.Equals(TEXT("Float"))) return UEdGraphSchema_K2::PC_Float;
-	if (TypeToken.Equals(TEXT("Double"))) return UEdGraphSchema_K2::PC_Double;
+	if (TypeToken.Equals(TEXT("Float"))) return UEdGraphSchema_K2::PC_Real;
+	if (TypeToken.Equals(TEXT("Double"))) return UEdGraphSchema_K2::PC_Real;
 	if (TypeToken.Equals(TEXT("Byte"))) return UEdGraphSchema_K2::PC_Byte;
 	if (TypeToken.Equals(TEXT("String"))) return UEdGraphSchema_K2::PC_String;
 	if (TypeToken.Equals(TEXT("Text"))) return UEdGraphSchema_K2::PC_Text;
@@ -332,6 +332,17 @@ bool FTypeParser::ParseTypeInternal(const FString& InTypeText, FEdGraphPinType& 
 				return true;
 			}
 		}
+		else if (PinCategory == UEdGraphSchema_K2::PC_Real)
+		{
+			// Modern float/double use category PC_Real with a subcategory
+			// (PC_Float / PC_Double) that selects the concrete property type.
+			// The Kismet compiler's CreatePrimitiveProperty only understands
+			// this modern form; the legacy bare PC_Float/PC_Double categories
+			// fall through to an FIntProperty fallback.
+			OutPinType.PinSubCategory = TypeText.Equals(TEXT("Double"))
+				? UEdGraphSchema_K2::PC_Double
+				: UEdGraphSchema_K2::PC_Float;
+		}
 		return true;
 	}
 
@@ -344,7 +355,10 @@ bool FTypeParser::ParseTypeInternal(const FString& InTypeText, FEdGraphPinType& 
 
 	if (UEnum* Enum = ResolveEnum(TypeText))
 	{
-		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Enum;
+		// Enums use category PC_Byte with the UEnum as the subcategory object —
+		// the same representation the Kismet compiler expects (the legacy
+		// PC_Enum category is not handled by CreatePrimitiveProperty).
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Byte;
 		OutPinType.PinSubCategoryObject = Enum;
 		return true;
 	}

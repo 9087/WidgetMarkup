@@ -1,9 +1,45 @@
 <WidgetBlueprint Script="Tests.TestVariable">
-  <!-- Normal default values -->
+  <!-- Normal scalar default values (channel A format) -->
   <Variable Name="Health" Type="Float" Default="100.0" />
   <Variable Name="PlayerName" Type="String" Default="Unknown" />
   <Variable Name="IsAlive" Type="Boolean" Default="true" />
   <Variable Name="Score" Type="Integer" Default="0" />
+
+  <!-- Struct default via channel A string (comma-separated) -->
+  <Variable Name="Scale" Type="Vector2D" Default="0.5,0.5" />
+  <Variable Name="Tint" Type="LinearColor" Default="1,0.15,0.15,1" />
+
+  <!-- Struct default via child elements -->
+  <Variable Name="Offset" Type="Vector2D">
+    <Vector2D X="1" Y="2" />
+  </Variable>
+
+  <!-- Enum default (channel A enum name) -->
+  <Variable Name="HAlign" Type="EHorizontalAlignment" Default="HAlign_Center" />
+
+  <!-- Text default -->
+  <Variable Name="Title" Type="Text" Default="Hello" />
+
+  <!-- Containers use child elements (route A) -->
+  <Variable Name="Weights" Type="Array(Float)">
+    <Float>1.0</Float>
+    <Float>2.0</Float>
+    <Float>3.0</Float>
+  </Variable>
+
+  <!-- Struct elements inside a container (route A) -->
+  <Variable Name="Points" Type="Array(Vector2D)">
+    <Vector2D X="1" Y="2" />
+    <Vector2D X="3" Y="4" />
+  </Variable>
+  <Variable Name="Tags" Type="Set(String)">
+    <String>red</String>
+    <String>blue</String>
+  </Variable>
+  <Variable Name="Scores" Type="Map(String,Integer)">
+    <Pair Key="a" Value="1" />
+    <Pair Key="b" Value="2" />
+  </Variable>
 
   <!-- Edge case: values containing {braces} MUST be stored as literal strings -->
   <Variable Name="LiteralBraces" Type="String" Default="{some text}" />

@@ -1,0 +1,10 @@
+<WidgetBlueprint Script="Tests.TestConflict">
+  <WidgetTree>
+    <CanvasPanel>
+      <TextBlock Text="conflict">
+        <!-- Font: value "oops" + child element <Size> -> compile error: cannot use both -->
+        <Font>oops<Size>18</Size></Font>
+      </TextBlock>
+    </CanvasPanel>
+  </WidgetTree>
+</WidgetBlueprint>
