@@ -27,6 +27,8 @@ namespace
 	constexpr int32 ExitInvalidPackagePath = 4;
 	constexpr int32 ExitModuleLoadFailed = 5;
 	constexpr int32 ExitShowWindowFailed = 6;
+	constexpr int32 ExitCompileFailed = 7;
+	constexpr int32 ExitTestTimeout = 8;
 }
 
 UWidgetMarkupLoopCommandlet::UWidgetMarkupLoopCommandlet()
@@ -89,6 +91,17 @@ int32 UWidgetMarkupLoopCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("ExtraArguments="), ExtraArguments);
 	WidgetMarkupModule.SetExtraArguments(ExtraArguments);
 
+	const bool bTestMode = ExtraArguments.Equals(TEXT("test"));
+	double TestTimeoutSeconds = 0.0;
+	FParse::Value(*Params, TEXT("WidgetMarkupTestTimeout="), TestTimeoutSeconds);
+
+	// In test mode, compile up front and fail fast so test runners can assert
+	// the exit code instead of scraping logs for compile errors.
+	if (bTestMode && !WidgetMarkupModule.CompileFromPackagePath(PackagePath))
+	{
+		return ExitCompileFailed;
+	}
+
 	FModuleManager::Get().LoadModule(TEXT("PythonScriptPlugin"));
 	FModuleManager::Get().LoadModule(TEXT("WidgetMarkupPythonScripting"));
 
@@ -101,10 +114,18 @@ int32 UWidgetMarkupLoopCommandlet::Main(const FString& Params)
 	}));
 
 	double LastTime = FPlatformTime::Seconds();
+	const double StartTime = LastTime;
 	while (!IsEngineExitRequested())
 	{
 		if (ExitCode != ExitSuccess)
 		{
+			break;
+		}
+
+		if (TestTimeoutSeconds > 0.0 && FPlatformTime::Seconds() - StartTime > TestTimeoutSeconds)
+		{
+			UE_LOG(LogWidgetMarkup, Error, TEXT("WidgetMarkup test timed out after %.1f seconds."), TestTimeoutSeconds);
+			ExitCode = ExitTestTimeout;
 			break;
 		}
 
@@ -138,6 +159,13 @@ int32 UWidgetMarkupLoopCommandlet::Main(const FString& Params)
 		}
 
 		FPlatformProcess::Sleep(0.001f);
+	}
+
+	// Let the script integration report its own exit code (e.g. Python test
+	// failures) so standalone runs and test runners can assert on it.
+	if (ExitCode == ExitSuccess)
+	{
+		ExitCode = WidgetMarkupModule.GetExitCode();
 	}
 
 	UE_LOG(LogWidgetMarkup, Display, TEXT("WidgetMarkupApp window closed."));

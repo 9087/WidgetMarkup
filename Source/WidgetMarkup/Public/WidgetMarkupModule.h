@@ -170,10 +170,15 @@ public:
 	const FString& GetExtraArguments() const { return ExtraArguments; }
 	void SetExtraArguments(const FString& InExtraArguments) { ExtraArguments = InExtraArguments; }
 
+	/** Process exit code reported by the script integration (e.g. test runs). */
+	int32 GetExitCode() const { return ExitCode; }
+	void SetExitCode(int32 InExitCode) { ExitCode = InExitCode; }
+
 private:
 	FOnInitialized OnInitialized;
 	bool bInitialized = false;
 	TArray<FSimpleDelegate> PendingInitializedCallbacks;
 	TSharedPtr<IWidgetMarkupScriptIntegration> ScriptIntegration;
 	FString ExtraArguments;
+	int32 ExitCode = 0;
 };

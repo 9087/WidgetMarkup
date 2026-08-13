@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0..\..\..\..\.."
 set "APP=Game\Binaries\Win64\WidgetMarkupApp.exe"
-set "EXTRA_ARGS=--extra-arguments "test -nullrhi""
+set "EXTRA_ARGS=--extra-arguments "test -nullrhi -WidgetMarkupTestTimeout=120""
 set "UPROJECT=%~1"
 if "%UPROJECT%"=="" set "UPROJECT=%CD%\Game\Game.uproject"
 
@@ -60,25 +60,18 @@ exit /b 0
 :run_negative_test
 set /a COUNT+=1
 echo [%COUNT%/%TOTAL%] %~2...
-:: A negative test is EXPECTED to fail compilation. A compile failure means the
-:: app never shuts down on its own, so run it in the background, wait, kill it,
-:: then assert the log shows a compile failure and no passing Python checks.
-set "TESTLOG=%CD%\Game\Saved\Logs\WidgetMarkupApp.log"
-if exist "%TESTLOG%" del /f /q "%TESTLOG%"
-start "" /b "%APP%" /WidgetMarkup/Tests/%~1 --project "%UPROJECT%" --extra-arguments "test -nullrhi -log" >nul 2>&1
-timeout /t 30 /nobreak >nul
-taskkill /F /IM WidgetMarkupApp.exe >nul 2>&1
-
-findstr /c:"CompileFromSourceCode failed" "%TESTLOG%" >nul 2>&1
-if errorlevel 1 goto :negative_fail
-findstr /c:"ALL CHECKS PASSED" "%TESTLOG%" >nul 2>&1
-if not errorlevel 1 goto :negative_fail
-echo [PASS] %~2 (expected compile failure)
+:: A negative test must fail compilation. In test mode the commandlet exits
+:: with code 7 when the initial compile fails, so assert the exact exit code
+:: instead of scraping logs or killing the process after a timeout.
+"%APP%" /WidgetMarkup/Tests/%~1 --project "%UPROJECT%" %EXTRA_ARGS%
+if errorlevel 8 goto :negative_fail
+if not errorlevel 7 goto :negative_fail
+echo [PASS] %~2 (expected compile failure with exit code 7)
 exit /b 0
 
 :negative_fail
 echo.
 echo ========================================
-echo TESTS FAILED (negative test %~1 did not fail as expected)
+echo TESTS FAILED (negative test %~1 did not fail compilation as expected)
 echo ========================================
 exit /b 1

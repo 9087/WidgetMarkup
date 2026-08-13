@@ -18,3 +18,8 @@ class Application:
     def request_shutdown():
         """Request engine exit (for standalone programs)."""
         return _Application.request_shutdown()
+
+    @staticmethod
+    def set_exit_code(code: int) -> None:
+        """Set the process exit code (for standalone programs and test runs)."""
+        return _Application.set_exit_code(code)

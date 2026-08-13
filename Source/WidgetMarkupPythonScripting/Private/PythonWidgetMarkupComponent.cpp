@@ -6,7 +6,14 @@
 #include "IPythonScriptPlugin.h"
 #include "PythonUtilities.h"
 #include "PythonWidgetMarkupListItem.h"
+#include "WidgetMarkupModule.h"
 #include "WidgetMarkupPythonScripting.h"
+
+namespace
+{
+	/** Process exit code reported when a Python component fails to load or construct. */
+	constexpr int32 ExitCodeScriptFailure = 1;
+}
 
 TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UUserWidget* InUserWidget, const FString& InScript)
 {
@@ -53,6 +60,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
 		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Failed to import component base module '%s' for Script '%s': %s"), WidgetMarkupComponentModuleName, *Script, *ErrorMessage);
+		FWidgetMarkupModule::Get().SetExitCode(ExitCodeScriptFailure);
 		return nullptr;
 	}
 
@@ -61,6 +69,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
 		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Module '%s' does not expose class '%hs' for Script '%s': %s"), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, *Script, *ErrorMessage);
+		FWidgetMarkupModule::Get().SetExitCode(ExitCodeScriptFailure);
 		return nullptr;
 	}
 
@@ -69,12 +78,14 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
 		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Class '%s.%hs' does not expose static method '%hs' for Script '%s': %s"), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, WidgetMarkupComponentCreateFunctionName, *Script, *ErrorMessage);
+		FWidgetMarkupModule::Get().SetExitCode(ExitCodeScriptFailure);
 		return nullptr;
 	}
 
 	if (!PyCallable_Check(PyFactoryFunction.Get()))
 	{
 		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("'%s.%hs.%hs' is not callable for Script '%s'."), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, WidgetMarkupComponentCreateFunctionName, *Script);
+		FWidgetMarkupModule::Get().SetExitCode(ExitCodeScriptFailure);
 		return nullptr;
 	}
 
@@ -86,6 +97,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
 		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Failed to allocate create arguments for Script '%s': %s"), *Script, *ErrorMessage);
+		FWidgetMarkupModule::Get().SetExitCode(ExitCodeScriptFailure);
 		return nullptr;
 	}
 
@@ -94,6 +106,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
 		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("Failed to convert module name '%s' to python argument for Script '%s': %s"), *ScriptModuleName, *Script, *ErrorMessage);
+		FWidgetMarkupModule::Get().SetExitCode(ExitCodeScriptFailure);
 		return nullptr;
 	}
 
@@ -105,6 +118,7 @@ TSharedPtr<FPythonWidgetMarkupComponent> FPythonWidgetMarkupComponent::Create(UU
 	{
 		const FString ErrorMessage = FPythonUtilities::ConsumePythonErrorMessage();
 		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("'%s.%hs.%hs' failed for module '%s' (Script '%s'): %s"), WidgetMarkupComponentModuleName, WidgetMarkupComponentClassName, WidgetMarkupComponentCreateFunctionName, *ScriptModuleName, *Script, *ErrorMessage);
+		FWidgetMarkupModule::Get().SetExitCode(ExitCodeScriptFailure);
 		return nullptr;
 	}
 
