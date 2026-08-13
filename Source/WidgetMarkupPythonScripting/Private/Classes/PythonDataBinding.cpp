@@ -184,13 +184,14 @@ namespace
 		}
 		if (FStructProperty* StructProperty = CastField<FStructProperty>(Property))
 		{
-			// Recursively fill struct fields from Python dict or object attributes.
-			// UE struct field names are PascalCase (R,G,B,A, SpecifiedColor) but
-			// Python wrappers may expose them as lowercase (r,g,b,a) or snake_case
-			// (specified_color). Try C++ name first, then lowercase-first-char,
-			// then snake_case fallback.
+			// Recursively fill struct fields from a Python dict (by C++ field
+			// name) or from a UE Python struct wrapper (via get_editor_property
+			// with the C++ field name). Missing fields keep their default value.
 			UScriptStruct* Struct = StructProperty->Struct;
-			Struct->InitializeStruct(OutData);
+			// NOTE: the destination is already initialized by FPropertyBuffer
+			// (AllocateAndInitializeValue) or FScriptArrayHelper::Resize, so do
+			// NOT call InitializeStruct here again; doing so would construct
+			// over constructed members and leak their existing allocations.
 
 			for (TFieldIterator<FProperty> It(Struct); It; ++It)
 			{
