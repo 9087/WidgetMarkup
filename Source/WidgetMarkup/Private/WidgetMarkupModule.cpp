@@ -211,6 +211,7 @@ void FWidgetMarkupModule::ShutdownModule()
 	UnregisterCustomPropertyRun(UListView::StaticClass(), TEXT("ListItems"));
 	UnregisterCustomPropertyRun(UWidget::StaticClass(), TEXT("Style"));
 	UnregisterCustomPropertyRun(UWidgetStyleSheet::StaticClass(), TEXT("Inherit"));
+	UnregisterCustomPropertyRun(FWidgetMarkupBlueprintVariable::StaticStruct(), TEXT("Default"));
 	UnregisterCustomPropertySetter(UListView::StaticClass(), TEXT("ListItems"));
 
 	FCoreDelegates::OnPostEngineInit.RemoveAll(this);
