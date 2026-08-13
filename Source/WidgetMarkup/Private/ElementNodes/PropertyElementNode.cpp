@@ -26,18 +26,6 @@ FPropertyElementNode::FPropertyElementNode(const FStringView& InPropertyName, co
 {
 }
 
-FPropertyElementNode::~FPropertyElementNode()
-{
-	if (BufferedPropertyContext.MatchesPath(PropertyPath))
-	{
-		const TSharedPtr<FPropertyBuffer> PropertyBuffer = BufferedPropertyContext.GetPropertyBuffer();
-		if (!ensureMsgf(PropertyBuffer.IsValid(), TEXT("BufferedPropertyContext matches path but has no property buffer.")))
-		{
-			return;
-		}
-	}
-}
-
 bool FPropertyElementNode::TryResolvePropertyPath(
 	const FContext& Context,
 	const FStringView& PropertyName,

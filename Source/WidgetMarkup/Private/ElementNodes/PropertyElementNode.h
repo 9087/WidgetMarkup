@@ -48,8 +48,6 @@ public:
 	/** Attribute form: (name, value). Element form: (element name, ElementData). */
 	FPropertyElementNode(const FStringView& InPropertyName, const FStringView& InPropertyValue, bool bInUseBufferedWrite = false);
 
-	virtual ~FPropertyElementNode() override;
-
 	virtual UStruct* GetPropertyOwnerStruct() const override;
 
 	//~Begin FElementNode interface
