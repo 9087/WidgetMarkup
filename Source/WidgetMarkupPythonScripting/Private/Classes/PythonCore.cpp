@@ -3,13 +3,13 @@
 #include "Classes/PythonCore.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Components/IWidgetMarkupComponent.h"
 #include "Components/Widget.h"
 #include "Engine/Blueprint.h"
 #include "Extensions/WidgetMarkupUserWidgetExtension.h"
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
 #include "PythonUtilities.h"
-#include "PythonWidgetMarkupComponent.h"
 #include "UObject/UObjectIterator.h"
 #include "WidgetMarkupModule.h"
 
@@ -127,15 +127,11 @@ namespace
 			{
 				if (const TSharedPtr<IWidgetMarkupComponent>& Component = Extension->GetWidgetMarkupComponent())
 				{
-					if (FPythonWidgetMarkupComponent* PythonComponent =
-						static_cast<FPythonWidgetMarkupComponent*>(Component.Get()))
+					if (void* PyInstance = Component->GetScriptInstance())
 					{
-						if (void* PyInstance = PythonComponent->GetPythonInstance())
-						{
-							PyObject* PyObj = static_cast<PyObject*>(PyInstance);
-							Py_INCREF(PyObj);
-							return PyObj;
-						}
+						PyObject* PyObj = static_cast<PyObject*>(PyInstance);
+						Py_INCREF(PyObj);
+						return PyObj;
 					}
 				}
 			}

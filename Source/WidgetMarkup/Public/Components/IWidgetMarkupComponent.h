@@ -11,4 +11,11 @@ public:
 
 	/** Refresh the component's display with the given data object. */
 	virtual void OnDataRefresh(class UObject* Data) {}
+
+	/**
+	 * Returns an opaque pointer to the backing script instance, or nullptr if
+	 * this component has no script backend. Only the owning script integration
+	 * may interpret the pointer.
+	 */
+	virtual void* GetScriptInstance() const { return nullptr; }
 };
