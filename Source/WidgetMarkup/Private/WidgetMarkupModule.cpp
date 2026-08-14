@@ -729,44 +729,54 @@ void FWidgetMarkupModule::HandleOnSourceFileDirectoryChanged(const TArray<struct
 	UE_LOG(LogWidgetMarkup, Display, TEXT("Source File Changed: directory watcher fired with %d change(s) in '%s'."), FileChanges.Num(), *WatchedDirectory);
 	for (const auto& FileChangeData : FileChanges)
 	{
+		// Resolve to a canonical absolute path once for all actions.
+		FString AbsoluteFilePath = FileChangeData.Filename;
+		if (FPaths::IsRelative(AbsoluteFilePath))
+		{
+			// The DirectoryWatcher may report a path relative to BaseDir()
+			// (e.g. ../../../Game/Content/File.widgetmarkup) instead of
+			// relative to the registered directory. ConvertRelativePathToFull
+			// resolves ../ against FPlatformProcess::BaseDir(), which
+			// produces the correct absolute path for both Engine/Binaries
+			// and Game/Binaries base directories.
+			AbsoluteFilePath = FPaths::ConvertRelativePathToFull(AbsoluteFilePath);
+		}
+		FPaths::NormalizeFilename(AbsoluteFilePath);
+
+		// Skip non-widgetmarkup files (e.g. __pycache__/*.pyc, *.py) to
+		// avoid spurious "could not convert to package path" warnings.
+		if (!AbsoluteFilePath.EndsWith(FWidgetMarkupModule::SourceFileExtension))
+		{
+			continue;
+		}
+
+		FString PackagePath;
+		if (!TryConvertAbsoluteSourceFilePathToPackagePath(AbsoluteFilePath, FWidgetMarkupModule::SourceFileExtension, PackagePath))
+		{
+			UE_LOG(LogWidgetMarkup, Warning, TEXT("Source File Changed: could not convert to package path ('%s')."), *AbsoluteFilePath);
+			continue;
+		}
+
 		switch (FileChangeData.Action)
 		{
 		case FFileChangeData::FCA_Added:
 		case FFileChangeData::FCA_Modified:
 		case FFileChangeData::FCA_RescanRequired:
-		{
-			FString AbsoluteFilePath = FileChangeData.Filename;
-			if (FPaths::IsRelative(AbsoluteFilePath))
-			{
-				// The DirectoryWatcher may report a path relative to BaseDir()
-				// (e.g. ../../../Game/Content/File.widgetmarkup) instead of
-				// relative to the registered directory. ConvertRelativePathToFull
-				// resolves ../ against FPlatformProcess::BaseDir(), which
-				// produces the correct absolute path for both Engine/Binaries
-				// and Game/Binaries base directories.
-				AbsoluteFilePath = FPaths::ConvertRelativePathToFull(AbsoluteFilePath);
-			}
-			FPaths::NormalizeFilename(AbsoluteFilePath);
-
-			// Skip non-widgetmarkup files (e.g. __pycache__/*.pyc, *.py) to
-			// avoid spurious "could not convert to package path" warnings.
-			if (!AbsoluteFilePath.EndsWith(FWidgetMarkupModule::SourceFileExtension))
-			{
-				break;
-			}
-
-			FString PackagePath;
-			if (!TryConvertAbsoluteSourceFilePathToPackagePath(AbsoluteFilePath, FWidgetMarkupModule::SourceFileExtension, PackagePath))
-			{
-				UE_LOG(LogWidgetMarkup, Warning, TEXT("Source File Changed: could not convert to package path ('%s')."), *AbsoluteFilePath);
-				break;
-			}
 			UE_LOG(LogWidgetMarkup, Display, TEXT("Source File Changed: '%s' -> '%s'."), *AbsoluteFilePath, *PackagePath);
 			CompileFromPackagePath(PackagePath);
 			break;
-		}
 		case FFileChangeData::FCA_Removed:
+		{
+			// Drop the compiled object so a deleted source does not keep a
+			// stale asset alive, and notify listeners (preview windows).
+			const FName PackagePathName(*PackagePath);
+			if (Objects.Remove(PackagePathName) > 0)
+			{
+				UE_LOG(LogWidgetMarkup, Display, TEXT("Source File Removed: dropped compiled object for '%s'."), *PackagePath);
+				GetOnObjectCompiled().Broadcast(PackagePathName, nullptr);
+			}
 			break;
+		}
 		case FFileChangeData::FCA_Unknown:
 			break;
 		default:
