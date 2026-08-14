@@ -16,6 +16,7 @@
 #include "RenderingThread.h"
 #include "Stats/Stats.h"
 #include "StandaloneRenderer.h"
+#include "UObject/GarbageCollection.h"
 #include "UObject/StrongObjectPtr.h"
 #include "WidgetMarkupModule.h"
 #include "Widgets/WidgetMarkupWindow.h"
@@ -95,6 +96,11 @@ int32 UWidgetMarkupLoopCommandlet::Main(const FString& Params)
 	double TestTimeoutSeconds = 0.0;
 	FParse::Value(*Params, TEXT("WidgetMarkupTestTimeout="), TestTimeoutSeconds);
 
+	// The standalone loop never runs the engine's automatic GC, so collect
+	// garbage on a fixed interval. Defaults to 60 seconds; <= 0 disables it.
+	double GCIntervalSeconds = 60.0;
+	FParse::Value(*Params, TEXT("WidgetMarkupGCInterval="), GCIntervalSeconds);
+
 	// In test mode, compile up front and fail fast so test runners can assert
 	// the exit code instead of scraping logs for compile errors.
 	if (bTestMode && !WidgetMarkupModule.CompileFromPackagePath(PackagePath))
@@ -115,6 +121,7 @@ int32 UWidgetMarkupLoopCommandlet::Main(const FString& Params)
 
 	double LastTime = FPlatformTime::Seconds();
 	const double StartTime = LastTime;
+	double LastGCTime = LastTime;
 	while (!IsEngineExitRequested())
 	{
 		if (ExitCode != ExitSuccess)
@@ -152,6 +159,12 @@ int32 UWidgetMarkupLoopCommandlet::Main(const FString& Params)
 
 		GFrameCounter++;
 		FStats::AdvanceFrame(false);
+
+		if (GCIntervalSeconds > 0.0 && CurrentTime - LastGCTime >= GCIntervalSeconds)
+		{
+			LastGCTime = CurrentTime;
+			CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+		}
 
 		if (FSlateApplication::Get().GetInteractiveTopLevelWindows().Num() == 0)
 		{
