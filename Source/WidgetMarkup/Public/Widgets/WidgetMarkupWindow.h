@@ -57,6 +57,7 @@ private:
 
 	FString PackagePath;
 	TSharedPtr<FPreviewScene> PreviewScene;
+	UPROPERTY(Transient)
 	TObjectPtr<UWidget> Widget;
 	TSharedPtr<SWindow> SlateWindow;
 	bool bIsRebuilding = false;

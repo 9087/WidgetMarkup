@@ -3,6 +3,7 @@
 #include "Widgets/WidgetMarkupWindow.h"
 
 #include "Misc/PackageName.h"
+#include "UObject/GarbageCollection.h"
 #include "WidgetBlueprint.h"
 #include "WidgetMarkupModule.h"
 #include "Blueprint/UserWidget.h"
@@ -102,6 +103,9 @@ void UWidgetMarkupWindow::RebuildWidget()
 
 	const TSharedRef<SWindow> LocalWindow = SlateWindow.ToSharedRef();
 
+	// Detach the previous widget from the member so it can be collected once
+	// the new content replaces it in the window (see the swap below).
+	TObjectPtr<UWidget> OldWidget = Widget;
 	Widget = nullptr;
 
 	auto& WidgetMarkupModule = FModuleManager::Get().LoadModuleChecked<FWidgetMarkupModule>(TEXT("WidgetMarkup"));
@@ -132,6 +136,23 @@ void UWidgetMarkupWindow::RebuildWidget()
 	if (NewContent.IsValid())
 	{
 		LocalWindow->SetContent(NewContent.ToSharedRef());
+
+		if (OldWidget)
+		{
+			// The window no longer references the old slate tree, so break the
+			// widget's self-cycle (UWidget owns its SObjectWidget, which keeps
+			// the widget alive via FGCObject) and collect the old widget, its
+			// Python component, and style buffers right away; the standalone
+			// app loop never runs GC on its own.
+			const FString OldWidgetPath = OldWidget->GetPathName();
+			TWeakObjectPtr<UWidget> WeakOldWidget = OldWidget;
+			OldWidget->ReleaseSlateResources(true);
+			OldWidget->MarkAsGarbage();
+			CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+			ensureMsgf(!WeakOldWidget.IsValid(), TEXT("Previous preview widget '%s' was not collected; a strong reference to it still exists."), *OldWidgetPath);
+			OldWidget = nullptr;
+		}
+
 		LocalWindow->MarkPrepassAsDirty();
 		LocalWindow->SlatePrepass();
 		const FVector2D DesiredSize = NewContent->GetDesiredSize();
@@ -141,6 +162,13 @@ void UWidgetMarkupWindow::RebuildWidget()
 			FMath::Max(DesiredSize.Y, 200.0f)
 		));
 		LocalWindow->MarkPrepassAsDirty();
+	}
+	else if (OldWidget)
+	{
+		// Compile or widget creation failed; keep displaying the previous
+		// widget and restore the reference so a later successful rebuild can
+		// still release it.
+		Widget = OldWidget;
 	}
 }
 
