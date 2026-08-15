@@ -2,6 +2,7 @@
 
 #include "Widgets/WidgetMarkupWindow.h"
 
+#include "InputCoreTypes.h"
 #include "Misc/PackageName.h"
 #include "UObject/GarbageCollection.h"
 #include "WidgetBlueprint.h"
@@ -86,6 +87,7 @@ bool UWidgetMarkupWindow::OpenWindow()
 		.Title(FText::FromString(AssetName))
 		[SNullWidget::NullWidget];
 	NewWindow->SetOnWindowClosed(FOnWindowClosed::CreateUObject(this, &UWidgetMarkupWindow::HandleSlateWindowClosed));
+	NewWindow->SetOnKeyDown(FOnKeyDown::CreateUObject(this, &UWidgetMarkupWindow::HandlePreviewWindowKeyDown));
 	SlateWindow = NewWindow;
 	FSlateApplication::Get().AddWindow(NewWindow);
 	RebuildWidget();
@@ -179,6 +181,30 @@ void UWidgetMarkupWindow::CloseWindow()
 		SlateWindow->RequestDestroyWindow();
 	}
 	SlateWindow.Reset();
+}
+
+void UWidgetMarkupWindow::Refresh()
+{
+	if (FWidgetMarkupModule* WidgetMarkupModule = FModuleManager::Get().GetModulePtr<FWidgetMarkupModule>(TEXT("WidgetMarkup")))
+	{
+		if (const TSharedPtr<IWidgetMarkupScriptIntegration> ScriptIntegration = WidgetMarkupModule->GetScriptIntegration())
+		{
+			ScriptIntegration->HandleRefreshRequest();
+		}
+	}
+
+	RebuildWidget();
+}
+
+FReply UWidgetMarkupWindow::HandlePreviewWindowKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (InKeyEvent.GetKey() == EKeys::F5)
+	{
+		UE_LOG(LogWidgetMarkup, Display, TEXT("WidgetMarkup window: F5 refresh for '%s'."), *PackagePath);
+		Refresh();
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
 }
 
 bool UWidgetMarkupWindow::IsWindowOpen() const

@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Input/Events.h"
+#include "Input/Reply.h"
 #include "PreviewScene.h"
 #include "UObject/Object.h"
 #include "UObject/StrongObjectPtr.h"
@@ -45,6 +47,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Widget Markup|Window")
 	bool IsWindowOpen() const;
 
+	/** Reload changed Python modules and rebuild the preview widget (bound to F5). */
+	UFUNCTION(BlueprintCallable, Category = "Widget Markup|Window")
+	void Refresh();
+
 	FOnWidgetMarkupWindowClosed OnWindowClosed;
 
 protected:
@@ -54,6 +60,7 @@ private:
 	void RebuildWidget();
 	void HandleOnObjectCompiled(FName Name, UObject* Object);
 	void HandleSlateWindowClosed(const TSharedRef<SWindow>& ClosedWindow);
+	FReply HandlePreviewWindowKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent);
 
 	FString PackagePath;
 	TSharedPtr<FPreviewScene> PreviewScene;

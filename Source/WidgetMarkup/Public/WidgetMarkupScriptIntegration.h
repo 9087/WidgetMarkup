@@ -12,7 +12,12 @@ protected:
 	explicit IWidgetMarkupScriptIntegration(FWidgetMarkupModule& InWidgetMarkupModule);
 
 public:
+	virtual ~IWidgetMarkupScriptIntegration() = default;
+
 	void Initialize(bool bOK);
+
+	/** Called when a refresh is requested (e.g. F5 in a preview window). The integration should reload its changed script modules. */
+	virtual void HandleRefreshRequest() {}
 
 protected:
 	FWidgetMarkupModule& WidgetMarkupModule;

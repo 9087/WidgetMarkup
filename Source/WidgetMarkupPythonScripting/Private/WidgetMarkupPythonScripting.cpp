@@ -3,12 +3,16 @@
 #include "WidgetMarkupPythonScripting.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Extensions/WidgetMarkupBlueprintExtension.h"
 #include "Extensions/WidgetMarkupBlueprintGeneratedClassExtension.h"
 #include "Extensions/WidgetMarkupUserWidgetExtension.h"
 #include "IPythonScriptPlugin.h"
+#include "Interfaces/IPluginManager.h"
 #include "Misc/Paths.h"
 #include "PythonWidgetMarkupComponent.h"
 #include "Classes/PythonWidgetMarkupModule.h"
+#include "WidgetBlueprint.h"
+#include "WidgetBlueprintExtension.h"
 #include "WidgetMarkupModule.h"
 
 FWidgetMarkupPythonScripting::FWidgetMarkupPythonScripting(FWidgetMarkupModule& InWidgetMarkupModule)
@@ -70,4 +74,100 @@ void FWidgetMarkupPythonScripting::HandleWidgetMarkupUserWidgetInitialized(UUser
 
 	RegisterPythonWidgetMarkupModule();
 	UWidgetMarkupUserWidgetExtension::GetOrAddExtension(UserWidget)->SetWidgetMarkupComponent(FPythonWidgetMarkupComponent::Create(UserWidget, Script));
+}
+
+void FWidgetMarkupPythonScripting::HandleRefreshRequest()
+{
+	if (!PythonScriptPlugin || !PythonScriptPlugin->IsPythonAvailable())
+	{
+		return;
+	}
+
+	// Collect script modules used by compiled widgets whose source file changed
+	// since the last reload. Saving a .py file only changes its timestamp; the
+	// actual reload happens here, on an explicit refresh request (e.g. F5).
+	TSet<FString> ModulesToReload;
+	TMap<FString, FDateTime> ModuleStamps;
+	for (const auto& Pair : WidgetMarkupModule.GetCompiledObjects())
+	{
+		if (const UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(Pair.Value))
+		{
+			if (const UWidgetMarkupBlueprintExtension* Extension = UWidgetBlueprintExtension::GetExtension<UWidgetMarkupBlueprintExtension>(WidgetBlueprint))
+			{
+				const FString Script = Extension->GetScript().TrimStartAndEnd();
+				if (Script.IsEmpty() || ModulesToReload.Contains(Script))
+				{
+					continue;
+				}
+
+				const FString ModuleFile = TryFindPythonModuleFile(Script);
+				if (ModuleFile.IsEmpty())
+				{
+					continue; // No trackable source file; leave the module as-is.
+				}
+				const FDateTime FileStamp = IFileManager::Get().GetTimeStamp(*ModuleFile);
+				if (FileStamp == FDateTime::MinValue())
+				{
+					continue; // Source file is missing.
+				}
+				const FDateTime* LastStamp = LastReloadTimes.Find(Script);
+				if (LastStamp && *LastStamp >= FileStamp)
+				{
+					continue; // Unchanged since the last reload.
+				}
+
+				ModulesToReload.Add(Script);
+				ModuleStamps.Add(Script, FileStamp);
+			}
+		}
+	}
+
+	if (ModulesToReload.IsEmpty())
+	{
+		UE_LOG(LogWidgetMarkupPythonScripting, Display, TEXT("WidgetMarkupPythonScripting: refresh requested but no Python module changed since the last reload."));
+		return;
+	}
+
+	// Reload through Python's own import machinery (importlib.reload) via the
+	// PythonScriptPlugin exec channel, so reload semantics match a manual
+	// reload in the Python console exactly.
+	FString ReloadScript = TEXT("import importlib, sys\n");
+	for (const FString& ModuleName : ModulesToReload)
+	{
+		ReloadScript += FString::Printf(
+			TEXT("_m = '%s'\nimportlib.reload(sys.modules[_m]) if _m in sys.modules else importlib.import_module(_m)\n"),
+			*ModuleName);
+	}
+	if (!PythonScriptPlugin->ExecPythonCommand(*ReloadScript))
+	{
+		UE_LOG(LogWidgetMarkupPythonScripting, Warning, TEXT("WidgetMarkupPythonScripting: one or more modules failed to reload (see the Python traceback above)."));
+	}
+
+	// Record the timestamps even on failure: a later edit updates the mtime and
+	// triggers another reload attempt on the next refresh.
+	for (const auto& StampPair : ModuleStamps)
+	{
+		LastReloadTimes.Add(StampPair.Key, StampPair.Value);
+	}
+}
+
+FString FWidgetMarkupPythonScripting::TryFindPythonModuleFile(const FString& ModuleName) const
+{
+	const FString RelativePath = ModuleName.Replace(TEXT("."), TEXT("/")) + TEXT(".py");
+
+	TArray<FString> Candidates;
+	Candidates.Add(FPaths::ProjectContentDir() / TEXT("Python") / RelativePath);
+	if (const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("WidgetMarkup")))
+	{
+		Candidates.Add(Plugin->GetContentDir() / TEXT("Python") / RelativePath);
+	}
+
+	for (const FString& Candidate : Candidates)
+	{
+		if (FPaths::FileExists(Candidate))
+		{
+			return Candidate;
+		}
+	}
+	return FString();
 }

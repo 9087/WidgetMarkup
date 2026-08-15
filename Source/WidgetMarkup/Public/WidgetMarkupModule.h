@@ -32,6 +32,12 @@ public:
 	UObject* GetObjectFromPackagePath(const FString& PackagePath);
 	UObject* GetObjectOrCompileFromPackage(const FString& PackagePath);
 
+	/** Access the compiled in-memory objects keyed by long package path (for tooling and script integrations). */
+	const TMap<FName, TObjectPtr<UObject>>& GetCompiledObjects() const { return Objects; }
+
+	/** Access the active script integration (may be null). */
+	TSharedPtr<IWidgetMarkupScriptIntegration> GetScriptIntegration() const { return ScriptIntegration; }
+
 	template <typename T>
 	T* CompileFromPackagePath(const FString& PackagePath)
 	{
