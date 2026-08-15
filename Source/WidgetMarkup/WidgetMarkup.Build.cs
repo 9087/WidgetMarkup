@@ -7,7 +7,14 @@ public class WidgetMarkup : ModuleRules
 	public WidgetMarkup(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		OptimizeCode = CodeOptimization.Never;
+
+		// Keep debug builds debuggable, but let Development/Shipping builds
+		// use UBT's default optimization settings.
+		if (Target.Configuration == UnrealTargetConfiguration.Debug ||
+			Target.Configuration == UnrealTargetConfiguration.DebugGame)
+		{
+			OptimizeCode = CodeOptimization.Never;
+		}
 		
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
