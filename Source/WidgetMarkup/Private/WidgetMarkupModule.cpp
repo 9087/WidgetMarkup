@@ -252,6 +252,14 @@ static bool TryConvertAbsoluteSourceFilePathToPackagePath(const FString& Absolut
 	return FPackageName::TryConvertFilenameToLongPackageName(FilePathWithoutExt, OutPackagePath);
 }
 
+// FFastXml declares its contents buffer as non-const but never writes to it
+// (verified in FastXml.cpp: it only measures the length and walks the buffer),
+// so keep the const_cast contained here instead of at every call site.
+static bool TryParseWidgetMarkupXml(IFastXmlCallback& Callback, const FString& XML, FText& OutErrorMessage, int32& OutErrorLineNumber)
+{
+	return FFastXml::ParseXmlFile(&Callback, nullptr, const_cast<TCHAR*>(*XML), GWarn, true, false, OutErrorMessage, OutErrorLineNumber);
+}
+
 // ---------------------------------------------------------------------------
 
 TSharedPtr<IPropertyRun> FWidgetMarkupModule::CreateCustomPropertyRun(UStruct* InStruct, FName InPropertyPath) const
@@ -479,7 +487,7 @@ UObject* FWidgetMarkupModule::CompileFromSourceCode(FName PackagePath, const FSt
 	FText ErrorMessage;
 	int32 ErrorLineNumber;
 	auto WidgetTreeBuilder = MakeShared<FElementTreeBuilder>(Package);
-	if (!FFastXml::ParseXmlFile(&WidgetTreeBuilder.Get(), nullptr, const_cast<TCHAR*>(*XML), GWarn, true, false, ErrorMessage, ErrorLineNumber))
+	if (!TryParseWidgetMarkupXml(WidgetTreeBuilder.Get(), XML, ErrorMessage, ErrorLineNumber))
 	{
 		// Prefer the semantic error collected by the element tree builder
 		// (e.g. "Property 'X': cannot use both a value and child elements");
