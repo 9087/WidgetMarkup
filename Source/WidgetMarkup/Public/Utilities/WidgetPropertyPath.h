@@ -11,7 +11,6 @@ enum class EWidgetPropertyPathElementType : uint8
 {
 	Property,
 	ArrayIndex,
-	MapKey,
 };
 
 USTRUCT()
@@ -35,8 +34,6 @@ struct WIDGETMARKUP_API FWidgetPropertyPathElement
 	static FWidgetPropertyPathElement MakeAnyProperty();
 	static FWidgetPropertyPathElement MakeArrayIndex(int32 InArrayIndex);
 	static FWidgetPropertyPathElement MakeAnyArrayIndex();
-	static FWidgetPropertyPathElement MakeMapKey(const FStringView& MapKey);
-	static FWidgetPropertyPathElement MakeAnyMapKey();
 
 	bool Matches(const FWidgetPropertyPathElement& Candidate) const;
 	FString ToString() const;
@@ -66,8 +63,6 @@ public:
 	FWidgetPropertyPath WithAppendedAnyProperty() const;
 	FWidgetPropertyPath WithAppendedArrayIndex(int32 ArrayIndex) const;
 	FWidgetPropertyPath WithAppendedAnyArrayIndex() const;
-	FWidgetPropertyPath WithAppendedMapKey(const FStringView& MapKey) const;
-	FWidgetPropertyPath WithAppendedAnyMapKey() const;
 
 	const TArray<FWidgetPropertyPathElement>& GetElements() const;
 
@@ -81,8 +76,6 @@ private:
 	void AppendAnyProperty();
 	void AppendArrayIndex(int32 ArrayIndex);
 	void AppendAnyArrayIndex();
-	void AppendMapKey(const FStringView& MapKey);
-	void AppendAnyMapKey();
 	void MarkPathNameDirty();
 
 	UPROPERTY(EditAnywhere, Category = "PropertyPath")

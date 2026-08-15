@@ -29,7 +29,6 @@ namespace
 		switch (Left.Type)
 		{
 		case EWidgetPropertyPathElementType::Property:
-		case EWidgetPropertyPathElementType::MapKey:
 			return Left.Name.Equals(Right.Name, ESearchCase::CaseSensitive);
 
 		case EWidgetPropertyPathElementType::ArrayIndex:
@@ -73,22 +72,6 @@ FWidgetPropertyPathElement FWidgetPropertyPathElement::MakeAnyArrayIndex()
 	return Element;
 }
 
-FWidgetPropertyPathElement FWidgetPropertyPathElement::MakeMapKey(const FStringView& MapKey)
-{
-	FWidgetPropertyPathElement Element;
-	Element.Type = EWidgetPropertyPathElementType::MapKey;
-	Element.Name = FString(MapKey);
-	return Element;
-}
-
-FWidgetPropertyPathElement FWidgetPropertyPathElement::MakeAnyMapKey()
-{
-	FWidgetPropertyPathElement Element;
-	Element.Type = EWidgetPropertyPathElementType::MapKey;
-	Element.bIsAny = true;
-	return Element;
-}
-
 bool FWidgetPropertyPathElement::Matches(const FWidgetPropertyPathElement& Candidate) const
 {
 	if (Type != Candidate.Type)
@@ -104,7 +87,6 @@ bool FWidgetPropertyPathElement::Matches(const FWidgetPropertyPathElement& Candi
 	switch (Type)
 	{
 	case EWidgetPropertyPathElementType::Property:
-	case EWidgetPropertyPathElementType::MapKey:
 		return Name.Equals(Candidate.Name, ESearchCase::CaseSensitive);
 
 	case EWidgetPropertyPathElementType::ArrayIndex:
@@ -124,9 +106,6 @@ FString FWidgetPropertyPathElement::ToString() const
 
 	case EWidgetPropertyPathElementType::ArrayIndex:
 		return bIsAny ? TEXT("[*]") : FString::Printf(TEXT("[%d]"), ArrayIndex);
-
-	case EWidgetPropertyPathElementType::MapKey:
-		return bIsAny ? TEXT("[*]") : FString::Printf(TEXT("[%s]"), *Name);
 
 	default:
 		return FString();
@@ -235,7 +214,7 @@ bool FWidgetPropertyPath::TryParse(const FStringView& InText, FWidgetPropertyPat
 				{
 					if (OutError)
 					{
-						*OutError = FString::Printf(TEXT("Map key segment '[%s]' is not supported yet in property path '%s'."), *BracketToken, *Text);
+						*OutError = FString::Printf(TEXT("Non-numeric bracket segment '[%s]' is not supported in property path '%s'."), *BracketToken, *Text);
 					}
 					return false;
 				}
@@ -376,8 +355,8 @@ bool FWidgetPropertyPath::TryMakeRelativeTo(const FWidgetPropertyPath& BasePath,
 	for (int32 ElementIndex = BaseElements.Num(); ElementIndex < Elements.Num(); ++ElementIndex)
 	{
 		const FWidgetPropertyPathElement& Element = Elements[ElementIndex];
-		const bool bIsPropertyOrMap = Element.Type == EWidgetPropertyPathElementType::Property || Element.Type == EWidgetPropertyPathElementType::MapKey;
-		if (bIsPropertyOrMap && !RelativePathString.IsEmpty())
+		const bool bIsProperty = Element.Type == EWidgetPropertyPathElementType::Property;
+		if (bIsProperty && !RelativePathString.IsEmpty())
 		{
 			RelativePathString.AppendChar(TCHAR('.'));
 		}
@@ -425,20 +404,6 @@ FWidgetPropertyPath FWidgetPropertyPath::WithAppendedAnyArrayIndex() const
 	return NewPath;
 }
 
-FWidgetPropertyPath FWidgetPropertyPath::WithAppendedMapKey(const FStringView& MapKey) const
-{
-	FWidgetPropertyPath NewPath = *this;
-	NewPath.AppendMapKey(MapKey);
-	return NewPath;
-}
-
-FWidgetPropertyPath FWidgetPropertyPath::WithAppendedAnyMapKey() const
-{
-	FWidgetPropertyPath NewPath = *this;
-	NewPath.AppendAnyMapKey();
-	return NewPath;
-}
-
 void FWidgetPropertyPath::AppendProperty(const FStringView& PropertyName)
 {
 	Elements.Add(FWidgetPropertyPathElement::MakeProperty(PropertyName));
@@ -460,18 +425,6 @@ void FWidgetPropertyPath::AppendArrayIndex(int32 ArrayIndex)
 void FWidgetPropertyPath::AppendAnyArrayIndex()
 {
 	Elements.Add(FWidgetPropertyPathElement::MakeAnyArrayIndex());
-	MarkPathNameDirty();
-}
-
-void FWidgetPropertyPath::AppendMapKey(const FStringView& MapKey)
-{
-	Elements.Add(FWidgetPropertyPathElement::MakeMapKey(MapKey));
-	MarkPathNameDirty();
-}
-
-void FWidgetPropertyPath::AppendAnyMapKey()
-{
-	Elements.Add(FWidgetPropertyPathElement::MakeAnyMapKey());
 	MarkPathNameDirty();
 }
 
