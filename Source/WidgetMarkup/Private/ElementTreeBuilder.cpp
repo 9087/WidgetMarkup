@@ -62,6 +62,7 @@ bool FElementTreeBuilder::ProcessElement(const TCHAR* ElementName, const TCHAR* 
 			ElementNode->SetElementData(ElementData);
 		}
 		FElementNode::FResult Result = ElementNode->Begin(Context, Outer, Struct);
+		CaptureFirstError(Result);
 		if (!Result)
 		{
 			ElementNode = nullptr;
@@ -80,6 +81,7 @@ bool FElementTreeBuilder::ProcessElement(const TCHAR* ElementName, const TCHAR* 
 			FallbackObjectNode->SetElementData(ElementData);
 		}
 		auto FallbackResult = FallbackObjectNode->Begin(Context, Outer, FallbackClass);
+		CaptureFirstError(FallbackResult);
 		if (!FallbackResult)
 		{
 			FallbackResult.PrintOnFailure();
@@ -90,7 +92,9 @@ bool FElementTreeBuilder::ProcessElement(const TCHAR* ElementName, const TCHAR* 
 	}
 	if (auto Current = GetCurrentElementNode())
 	{
-		if (!Current->OnAddChild(ElementNode.ToSharedRef()).PrintOnFailure())
+		FElementNode::FResult AddResult = Current->OnAddChild(ElementNode.ToSharedRef());
+		CaptureFirstError(AddResult);
+		if (!AddResult.PrintOnFailure())
 		{
 			return false;
 		}
@@ -128,6 +132,7 @@ bool FElementTreeBuilder::ProcessAttribute(const TCHAR* AttributeName, const TCH
 
 	if (!Result)
 	{
+		CaptureFirstError(Result);
 		UE_LOG(LogWidgetMarkup, Error, TEXT("ProcessAttribute FAILED: '%s'='%s' on class '%s'"),
 			*FString(PropertyName), *FString(PropertyValue),
 			Object ? *Object->GetClass()->GetName() : TEXT("<null>"));
@@ -149,7 +154,9 @@ bool FElementTreeBuilder::ProcessClose(const TCHAR* Element)
 
 	if (FPropertyElementNode* PropertyElementNode = CastElementNode<FPropertyElementNode>(Current.Get()))
 	{
-		return PropertyElementNode->GetPropertyRunInternal()->OnEnd(Context) ? true : false;
+		FElementNode::FResult PropertyEndResult = PropertyElementNode->GetPropertyRunInternal()->OnEnd(Context);
+		CaptureFirstError(PropertyEndResult);
+		return PropertyEndResult ? true : false;
 	}
 
 	Current = Context.Pop();
@@ -170,7 +177,9 @@ bool FElementTreeBuilder::ProcessClose(const TCHAR* Element)
 			}
 		}
 	}
-	if (!Current->End().PrintOnFailure())
+	FElementNode::FResult EndResult = Current->End();
+	CaptureFirstError(EndResult);
+	if (!EndResult.PrintOnFailure())
 	{
 		return false;
 	}
@@ -204,4 +213,12 @@ TSharedPtr<FElementNode> FElementTreeBuilder::GetRootElementNode()
 TSharedPtr<FElementNode> FElementTreeBuilder::GetCurrentElementNode() const
 {
 	return !Context.IsEmpty() ? Context.GetLastNode() : TSharedPtr<FElementNode>();
+}
+
+void FElementTreeBuilder::CaptureFirstError(const FElementNode::FResult& Result)
+{
+	if (FirstErrorText.IsEmpty())
+	{
+		FirstErrorText = Result.GetFirstErrorText();
+	}
 }

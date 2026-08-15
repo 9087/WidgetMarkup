@@ -38,6 +38,9 @@ public:
 	/** Access the active script integration (may be null). */
 	TSharedPtr<IWidgetMarkupScriptIntegration> GetScriptIntegration() const { return ScriptIntegration; }
 
+	/** Returns the last compile error for a package path, or null if the last compile succeeded. */
+	const FText* GetLastCompileError(FName PackagePath) const { return LastCompileErrors.Find(PackagePath); }
+
 	template <typename T>
 	T* CompileFromPackagePath(const FString& PackagePath)
 	{
@@ -136,6 +139,8 @@ private:
 	UObject* CompileFromSourceCode(FName PackagePath, const FString& XML);
 
 	TMap<FName, TObjectPtr<UObject>> Objects;
+	/** Last compile error text per normalized package path; removed on success. */
+	TMap<FName, FText> LastCompileErrors;
 	FOnObjectCompiled OnObjectCompiled;
 	FOnWidgetMarkupUserWidgetInitialized OnWidgetMarkupUserWidgetInitialized;
 

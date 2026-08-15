@@ -30,9 +30,15 @@ public:
 	TSharedPtr<FElementNode> GetRootElementNode();
 	TSharedPtr<FElementNode> GetCurrentElementNode() const;
 
+	/** First error message collected while parsing, for status reporting. */
+	const FText& GetFirstErrorText() const { return FirstErrorText; }
+
 protected:
+	void CaptureFirstError(const FElementNode::FResult& Result);
+
 	TObjectPtr<UObject> Outer;
 	FElementNode::FContext Context;
 	TSharedPtr<FElementNode> RootElementNode;
 	FWidgetMarkupModule* WidgetMarkupModule = nullptr;
+	FText FirstErrorText;
 };

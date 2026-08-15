@@ -4,14 +4,19 @@
 
 #include "InputCoreTypes.h"
 #include "Misc/PackageName.h"
+#include "Styling/CoreStyle.h"
+#include "Styling/SlateColor.h"
 #include "UObject/GarbageCollection.h"
 #include "WidgetBlueprint.h"
 #include "WidgetMarkupModule.h"
 #include "Blueprint/UserWidget.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SNullWidget.h"
+#include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/SVerticalBox.h"
 #include "Widgets/SWindow.h"
+#include "Widgets/Text/STextBlock.h"
 
 UWidgetMarkupWindow::UWidgetMarkupWindow() = default;
 
@@ -112,6 +117,7 @@ void UWidgetMarkupWindow::RebuildWidget()
 
 	auto& WidgetMarkupModule = FModuleManager::Get().LoadModuleChecked<FWidgetMarkupModule>(TEXT("WidgetMarkup"));
 	UObject* Object = WidgetMarkupModule.GetObjectOrCompileFromPackage(PackagePath);
+	const FText* CompileError = Object ? nullptr : WidgetMarkupModule.GetLastCompileError(FName(*PackagePath));
 
 	TSharedPtr<SWidget> NewContent = nullptr;
 
@@ -135,35 +141,19 @@ void UWidgetMarkupWindow::RebuildWidget()
 		}
 	}
 
+	// Detach whatever is displayed right now so the previous widget's slate
+	// can be safely re-parented (failure path) or destroyed (success path).
+	LocalWindow->SetContent(SNullWidget::NullWidget);
+
+	TSharedRef<SVerticalBox> Root = SNew(SVerticalBox);
+
 	if (NewContent.IsValid())
 	{
-		LocalWindow->SetContent(NewContent.ToSharedRef());
-
-		if (OldWidget)
-		{
-			// The window no longer references the old slate tree, so break the
-			// widget's self-cycle (UWidget owns its SObjectWidget, which keeps
-			// the widget alive via FGCObject) and collect the old widget, its
-			// Python component, and style buffers right away; the standalone
-			// app loop never runs GC on its own.
-			const FString OldWidgetPath = OldWidget->GetPathName();
-			TWeakObjectPtr<UWidget> WeakOldWidget = OldWidget;
-			OldWidget->ReleaseSlateResources(true);
-			OldWidget->MarkAsGarbage();
-			CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
-			ensureMsgf(!WeakOldWidget.IsValid(), TEXT("Previous preview widget '%s' was not collected; a strong reference to it still exists."), *OldWidgetPath);
-			OldWidget = nullptr;
-		}
-
-		LocalWindow->MarkPrepassAsDirty();
-		LocalWindow->SlatePrepass();
-		const FVector2D DesiredSize = NewContent->GetDesiredSize();
-		UE_LOG(LogWidgetMarkup, Log, TEXT("WidgetMarkup window: content DesiredSize = %.0fx%.0f"), DesiredSize.X, DesiredSize.Y);
-		LocalWindow->Resize(FVector2D(
-			FMath::Max(DesiredSize.X, 300.0f),
-			FMath::Max(DesiredSize.Y, 200.0f)
-		));
-		LocalWindow->MarkPrepassAsDirty();
+		Root->AddSlot()
+		.AutoHeight()
+		[
+			NewContent.ToSharedRef()
+		];
 	}
 	else if (OldWidget)
 	{
@@ -171,6 +161,61 @@ void UWidgetMarkupWindow::RebuildWidget()
 		// widget and restore the reference so a later successful rebuild can
 		// still release it.
 		Widget = OldWidget;
+		Root->AddSlot()
+		.AutoHeight()
+		[
+			OldWidget->TakeWidget()
+		];
+	}
+
+	// Show the last compile error in a status bar below the content. The slot
+	// is added only when there is an error, so it takes no space otherwise.
+	if (CompileError && !CompileError->IsEmpty())
+	{
+		Root->AddSlot()
+		.AutoHeight()
+		[
+			SNew(SBorder)
+			.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+			.BorderBackgroundColor(FLinearColor(0.9f, 0.1f, 0.1f, 0.65f))
+			.Padding(FMargin(8.0f, 4.0f))
+			[
+				SNew(STextBlock)
+				.Text(*CompileError)
+				.ColorAndOpacity(FSlateColor(FLinearColor::White))
+				.AutoWrapText(true)
+			]
+		];
+	}
+
+	if (Root->NumSlots() > 0)
+	{
+		LocalWindow->SetContent(Root);
+		LocalWindow->MarkPrepassAsDirty();
+		LocalWindow->SlatePrepass();
+		const FVector2D DesiredSize = Root->GetDesiredSize();
+		UE_LOG(LogWidgetMarkup, Log, TEXT("WidgetMarkup window: content DesiredSize = %.0fx%.0f"), DesiredSize.X, DesiredSize.Y);
+		LocalWindow->Resize(FVector2D(
+			FMath::Max(DesiredSize.X, 300.0f),
+			FMath::Max(DesiredSize.Y, 200.0f)
+		));
+		LocalWindow->MarkPrepassAsDirty();
+	}
+
+	if (NewContent.IsValid() && OldWidget)
+	{
+		// The window no longer references the old slate tree, so break the
+		// widget's self-cycle (UWidget owns its SObjectWidget, which keeps
+		// the widget alive via FGCObject) and collect the old widget, its
+		// Python component, and style buffers right away; the standalone
+		// app loop never runs GC on its own.
+		const FString OldWidgetPath = OldWidget->GetPathName();
+		TWeakObjectPtr<UWidget> WeakOldWidget = OldWidget;
+		OldWidget->ReleaseSlateResources(true);
+		OldWidget->MarkAsGarbage();
+		CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+		ensureMsgf(!WeakOldWidget.IsValid(), TEXT("Previous preview widget '%s' was not collected; a strong reference to it still exists."), *OldWidgetPath);
+		OldWidget = nullptr;
 	}
 }
 

@@ -481,16 +481,32 @@ UObject* FWidgetMarkupModule::CompileFromSourceCode(FName PackagePath, const FSt
 	auto WidgetTreeBuilder = MakeShared<FElementTreeBuilder>(Package);
 	if (!FFastXml::ParseXmlFile(&WidgetTreeBuilder.Get(), nullptr, const_cast<TCHAR*>(*XML), GWarn, true, false, ErrorMessage, ErrorLineNumber))
 	{
-		UE_LOG(LogWidgetMarkup, Error, TEXT("CompileFromSourceCode failed: XML parse error at line %d: %s"), ErrorLineNumber, *ErrorMessage.ToString());
+		// Prefer the semantic error collected by the element tree builder
+		// (e.g. "Property 'X': cannot use both a value and child elements");
+		// fall back to the XML parse error with its line number.
+		FText ErrorText;
+		const FText BuilderError = WidgetTreeBuilder->GetFirstErrorText();
+		if (!BuilderError.IsEmpty())
+		{
+			ErrorText = FText::Format(FText::FromString(TEXT("{0} (line {1})")), BuilderError, FText::AsNumber(ErrorLineNumber));
+		}
+		else
+		{
+			ErrorText = FText::Format(FText::FromString(TEXT("XML parse error at line {0}: {1}")), FText::AsNumber(ErrorLineNumber), ErrorMessage);
+		}
+		UE_LOG(LogWidgetMarkup, Error, TEXT("CompileFromSourceCode failed: %s"), *ErrorText.ToString());
+		LastCompileErrors.Add(LongPackagePathName, ErrorText);
 		return nullptr;
 	}
 	auto RootElementNode = WidgetTreeBuilder->GetRootElementNode();
 	if (!RootElementNode.IsValid())
 	{
 		UE_LOG(LogWidgetMarkup, Error, TEXT("CompileFromSourceCode failed: no root element produced for '%s'."), *LongPackagePath);
+		LastCompileErrors.Add(LongPackagePathName, FText::FromString(TEXT("No root element produced.")));
 		return nullptr;
 	}
 	auto Object = RootElementNode->GetObject();
+	LastCompileErrors.Remove(LongPackagePathName);
 	Objects.FindOrAdd(LongPackagePathName) = Object;
 	GetOnObjectCompiled().Broadcast(LongPackagePathName, Object);
 	return Object;
@@ -500,19 +516,25 @@ UObject* FWidgetMarkupModule::CompileFromPackagePath(const FString& PackagePath)
 {
 	UE_LOG(LogWidgetMarkup, Display, TEXT("Compile Package Path '%s'."), *PackagePath);
 
+	// Use the same normalized key as CompileFromSourceCode so error lookups match.
+	const FString NormalizedPackagePath = PackagePath.StartsWith(TEXT("/")) ? PackagePath : FString::Printf(TEXT("/WidgetMarkup/%s"), *PackagePath);
+	const FName PackagePathName(*NormalizedPackagePath);
+
 	FString AbsoluteFilePath;
 	if (!TryConvertPackagePathToAbsoluteSourceFilePath(PackagePath, FWidgetMarkupModule::SourceFileExtension, AbsoluteFilePath))
 	{
 		UE_LOG(LogWidgetMarkup, Error, TEXT("CompileFromPackagePath failed: invalid package path '%s' (expected /Game/... format)."), *PackagePath);
+		LastCompileErrors.Add(PackagePathName, FText::FromString(TEXT("Invalid package path (expected /Game/... format).")));
 		return nullptr;
 	}
 	FString XML;
 	if (!FFileHelper::LoadFileToString(XML, *AbsoluteFilePath, FFileHelper::EHashOptions::None, FILEREAD_AllowWrite) || XML.IsEmpty())
 	{
 		UE_LOG(LogWidgetMarkup, Error, TEXT("CompileFromPackagePath failed: could not read file or file is empty ('%s')."), *AbsoluteFilePath);
+		LastCompileErrors.Add(PackagePathName, FText::FromString(TEXT("Could not read source file or file is empty.")));
 		return nullptr;
 	}
-	return CompileFromSourceCode(FName(PackagePath), XML);
+	return CompileFromSourceCode(PackagePathName, XML);
 }
 
 UObject* FWidgetMarkupModule::GetObjectFromPackagePath(const FString& PackagePath)

@@ -73,6 +73,7 @@ public:
 	public:
 		FMessage(const FText& InText, EMessageType InType);
 		const FText& GetText() const;
+		EMessageType GetType() const { return Type; }
 
 	private:
 		FText Text;
@@ -92,6 +93,9 @@ public:
 		bool operator!() const;
 
 		FResult& PrintOnFailure();
+
+		/** Returns the text of the first error message, or an empty text. */
+		FText GetFirstErrorText() const;
 
 	private:
 		FResult() = default;

@@ -70,6 +70,18 @@ FElementNode::FResult& FElementNode::FResult::PrintOnFailure()
 	return *this;
 }
 
+FText FElementNode::FResult::GetFirstErrorText() const
+{
+	for (const TSharedRef<FMessage>& Message : Messages)
+	{
+		if (Message->GetType() == EMessageType::Error)
+		{
+			return Message->GetText();
+		}
+	}
+	return FText();
+}
+
 void FElementNode::FContext::Push(const TSharedRef<FElementNode>& ElementNode)
 {
 	Nodes.Push(ElementNode);
