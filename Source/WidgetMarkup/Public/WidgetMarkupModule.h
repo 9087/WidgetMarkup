@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Containers/Ticker.h"
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 #include "Blueprint/WidgetBlueprintGeneratedClass.h"
@@ -22,6 +23,9 @@ class WIDGETMARKUP_API FWidgetMarkupModule : public IModuleInterface, public FGC
 {
 public:
 	static constexpr const TCHAR* SourceFileExtension = TEXT(".widgetmarkup");
+
+	/** Delay used to coalesce bursts of directory-watcher events into a single recompile batch. */
+	static constexpr float CompileDebounceDelaySeconds = 0.15f;
 
 	static FWidgetMarkupModule& Get();
 
@@ -157,10 +161,16 @@ public:
 
 private:
 	void HandleOnSourceFileDirectoryChanged(const TArray<struct FFileChangeData>& FileChanges, const FString& WatchedDirectory);
+	void EnsureCompileDebounceTicker();
+	bool TickCompileDebounce(float DeltaSeconds);
 
 	TMap<FString, FName> SourceFileToName;
 	/** Maps absolute watched directory path -> delegate handle. Supports multiple watched directories. */
 	TMap<FString, FDelegateHandle> WatchedDirectories;
+
+	/** Package paths waiting to be recompiled after the debounce window. */
+	TSet<FName> PendingCompilePaths;
+	FTSTicker::FDelegateHandle CompileDebounceTickerHandle;
 
 public:
 	DECLARE_MULTICAST_DELEGATE(FOnInitialized);

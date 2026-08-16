@@ -216,6 +216,12 @@ void FWidgetMarkupModule::ShutdownModule()
 
 	FCoreDelegates::OnPostEngineInit.RemoveAll(this);
 	StopSourceFileWatching();
+	if (CompileDebounceTickerHandle.IsValid())
+	{
+		FTSTicker::RemoveTicker(CompileDebounceTickerHandle);
+		CompileDebounceTickerHandle.Reset();
+	}
+	PendingCompilePaths.Empty();
 	PropertyRunCreateDelegates.Empty();
 	PropertySetterCreateDelegates.Empty();
 }
@@ -786,6 +792,7 @@ void FWidgetMarkupModule::HandleOnSourceFileDirectoryChanged(const TArray<struct
 			UE_LOG(LogWidgetMarkup, Warning, TEXT("Source File Changed: could not convert to package path ('%s')."), *AbsoluteFilePath);
 			continue;
 		}
+		const FName PackagePathName(*PackagePath);
 
 		switch (FileChangeData.Action)
 		{
@@ -793,13 +800,19 @@ void FWidgetMarkupModule::HandleOnSourceFileDirectoryChanged(const TArray<struct
 		case FFileChangeData::FCA_Modified:
 		case FFileChangeData::FCA_RescanRequired:
 			UE_LOG(LogWidgetMarkup, Display, TEXT("Source File Changed: '%s' -> '%s'."), *AbsoluteFilePath, *PackagePath);
-			CompileFromPackagePath(PackagePath);
+			// Coalesce bursts of events (e.g. atomic saves emit several per
+			// save) into a single recompile per package after a short window.
+			PendingCompilePaths.Add(PackagePathName);
+			EnsureCompileDebounceTicker();
 			break;
 		case FFileChangeData::FCA_Removed:
 		{
+			// A removed file needs no recompile; drop any pending one so a
+			// quick delete + recreate still compiles the new content once.
+			PendingCompilePaths.Remove(PackagePathName);
+
 			// Drop the compiled object so a deleted source does not keep a
 			// stale asset alive, and notify listeners (preview windows).
-			const FName PackagePathName(*PackagePath);
 			if (Objects.Remove(PackagePathName) > 0)
 			{
 				UE_LOG(LogWidgetMarkup, Display, TEXT("Source File Removed: dropped compiled object for '%s'."), *PackagePath);
@@ -813,6 +826,31 @@ void FWidgetMarkupModule::HandleOnSourceFileDirectoryChanged(const TArray<struct
 			ensureMsgf(false, TEXT("Not implemented for File Change Action: %d!"), FileChangeData.Action);
 		}
 	}
+}
+
+void FWidgetMarkupModule::EnsureCompileDebounceTicker()
+{
+	if (!CompileDebounceTickerHandle.IsValid())
+	{
+		CompileDebounceTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+			FTickerDelegate::CreateRaw(this, &FWidgetMarkupModule::TickCompileDebounce),
+			FWidgetMarkupModule::CompileDebounceDelaySeconds);
+	}
+}
+
+bool FWidgetMarkupModule::TickCompileDebounce(float DeltaSeconds)
+{
+	CompileDebounceTickerHandle.Reset();
+
+	TSet<FName> PathsToCompile = MoveTemp(PendingCompilePaths);
+	PendingCompilePaths.Reset();
+
+	for (const FName& PackagePathName : PathsToCompile)
+	{
+		CompileFromPackagePath(PackagePathName.ToString());
+	}
+
+	return false; // one-shot ticker
 }
 
 void FWidgetMarkupModule::StartUp(TSharedRef<IWidgetMarkupScriptIntegration> InScriptIntegration)
