@@ -51,6 +51,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Widget Markup|Window")
 	void Refresh();
 
+	/** Handles the F5 key from the preview slate widget. */
+	FReply HandlePreviewF5();
+
 	FOnWidgetMarkupWindowClosed OnWindowClosed;
 
 protected:
@@ -60,7 +63,6 @@ private:
 	void RebuildWidget();
 	void HandleOnObjectCompiled(FName Name, UObject* Object);
 	void HandleSlateWindowClosed(const TSharedRef<SWindow>& ClosedWindow);
-	FReply HandlePreviewWindowKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent);
 
 	FString PackagePath;
 	TSharedPtr<FPreviewScene> PreviewScene;

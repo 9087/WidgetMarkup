@@ -18,6 +18,40 @@
 #include "Widgets/SWindow.h"
 #include "Widgets/Text/STextBlock.h"
 
+/**
+ * Root widget of the preview window. Overrides OnKeyDown so F5 refreshes the
+ * window even though SWidget has no key-down delegate setter in this engine.
+ */
+class SWidgetMarkupPreviewRoot : public SVerticalBox
+{
+public:
+	SLATE_BEGIN_ARGS(SWidgetMarkupPreviewRoot) {}
+		SLATE_ARGUMENT(TWeakObjectPtr<UWidgetMarkupWindow>, OwnerWindow)
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs)
+	{
+		OwnerWindow = InArgs._OwnerWindow;
+	}
+
+	virtual bool SupportsKeyboardFocus() const override
+	{
+		return true;
+	}
+
+	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override
+	{
+		if (UWidgetMarkupWindow* Owner = OwnerWindow.Get(); Owner && InKeyEvent.GetKey() == EKeys::F5)
+		{
+			return Owner->HandlePreviewF5();
+		}
+		return SVerticalBox::OnKeyDown(MyGeometry, InKeyEvent);
+	}
+
+private:
+	TWeakObjectPtr<UWidgetMarkupWindow> OwnerWindow;
+};
+
 UWidgetMarkupWindow::UWidgetMarkupWindow() = default;
 
 UWidgetMarkupWindow* UWidgetMarkupWindow::CreateWidgetMarkupWindow(UObject* Outer, const FString& InPackagePath)
@@ -92,7 +126,6 @@ bool UWidgetMarkupWindow::OpenWindow()
 		.Title(FText::FromString(AssetName))
 		[SNullWidget::NullWidget];
 	NewWindow->SetOnWindowClosed(FOnWindowClosed::CreateUObject(this, &UWidgetMarkupWindow::HandleSlateWindowClosed));
-	NewWindow->SetOnKeyDown(FOnKeyDown::CreateUObject(this, &UWidgetMarkupWindow::HandlePreviewWindowKeyDown));
 	SlateWindow = NewWindow;
 	FSlateApplication::Get().AddWindow(NewWindow);
 	RebuildWidget();
@@ -145,7 +178,8 @@ void UWidgetMarkupWindow::RebuildWidget()
 	// can be safely re-parented (failure path) or destroyed (success path).
 	LocalWindow->SetContent(SNullWidget::NullWidget);
 
-	TSharedRef<SVerticalBox> Root = SNew(SVerticalBox);
+	TSharedRef<SWidgetMarkupPreviewRoot> Root = SNew(SWidgetMarkupPreviewRoot)
+		.OwnerWindow(this);
 
 	if (NewContent.IsValid())
 	{
@@ -191,6 +225,9 @@ void UWidgetMarkupWindow::RebuildWidget()
 	if (Root->NumSlots() > 0)
 	{
 		LocalWindow->SetContent(Root);
+		// Give the root focus so F5 keeps working right after the window opens
+		// or after a rebuild replaced the content.
+		FSlateApplication::Get().SetKeyboardFocus(Root);
 		LocalWindow->MarkPrepassAsDirty();
 		LocalWindow->SlatePrepass();
 		const FVector2D DesiredSize = Root->GetDesiredSize();
@@ -241,15 +278,11 @@ void UWidgetMarkupWindow::Refresh()
 	RebuildWidget();
 }
 
-FReply UWidgetMarkupWindow::HandlePreviewWindowKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+FReply UWidgetMarkupWindow::HandlePreviewF5()
 {
-	if (InKeyEvent.GetKey() == EKeys::F5)
-	{
-		UE_LOG(LogWidgetMarkup, Display, TEXT("WidgetMarkup window: F5 refresh for '%s'."), *PackagePath);
-		Refresh();
-		return FReply::Handled();
-	}
-	return FReply::Unhandled();
+	UE_LOG(LogWidgetMarkup, Display, TEXT("WidgetMarkup window: F5 refresh for '%s'."), *PackagePath);
+	Refresh();
+	return FReply::Handled();
 }
 
 bool UWidgetMarkupWindow::IsWindowOpen() const
