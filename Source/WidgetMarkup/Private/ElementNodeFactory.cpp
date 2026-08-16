@@ -76,9 +76,8 @@ TSharedPtr<FElementNode> FElementNodeFactory::CreateElementNode(UObject* Outer, 
 
 	if (Struct == nullptr)
 	{
-		// Check basic types before falling through to TryFindTypeSlow,
-		// which would log a warning for names like "float" or "int".
-		// FTypeParser::ToPinCategory is shared with the Variable type system.
+		// Check basic types before resolving by name. FTypeParser::ToPinCategory
+		// is shared with the Variable type system.
 		const FName PinCategory = FTypeParser::ToPinCategory(ElementName);
 		if (PinCategory != NAME_None)
 		{

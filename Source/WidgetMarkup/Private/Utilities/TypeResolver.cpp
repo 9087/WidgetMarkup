@@ -6,6 +6,7 @@
 
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
+#include "UObject/UObjectGlobals.h"
 #include "UObject/UObjectIterator.h"
 #include "WidgetBlueprint.h"
 #include "WidgetMarkupModule.h"
@@ -116,52 +117,57 @@ T* TTypeResolver<T>::ResolveShortName(const FString& Token)
 		return nullptr;
 	}
 
-	// Cache: each short name goes through TryFindTypeSlow at most once.
-	// Subsequent lookups hit the cache with zero warnings.
+	// Cache both hits and misses so each short name is resolved at most once.
 	static TMap<FName, TWeakObjectPtr<UObject>> Cache;
 
 	const FName Key(*Token);
 	if (const TWeakObjectPtr<UObject>* Cached = Cache.Find(Key))
 	{
-		if (Cached->IsValid())
-		{
-			return Cast<T>(Cached->Get());
-		}
-		Cache.Remove(Key);
+		return Cached->IsValid() ? Cast<T>(Cached->Get()) : nullptr;
 	}
 
-	// TryFindTypeSlow — will warn for unknown types, but only once per name.
-	if (T* Type = UClass::TryFindTypeSlow<T>(Token, EFindFirstObjectOptions::None))
+	T* Type = nullptr;
+
+	// Silent exact-name lookup first. TryFindTypeSlow is intentionally NOT
+	// used here: it logs a "Short type name..." warning with a callstack for
+	// every probe miss, which floods the log during normal parsing.
+	if (T* Found = FindObject<T>(nullptr, *Token))
 	{
 		if constexpr (std::is_same_v<T, UStruct>)
 		{
-			if (Type->IsA<UClass>())
-			{
-				return nullptr;
-			}
+			Type = Found->IsA<UClass>() ? nullptr : Found;
 		}
-		Cache.Add(Key, Type);
-		return Type;
+		else
+		{
+			Type = Found;
+		}
 	}
 
-	// Fall back to iterator with case-sensitive exact match.
-	for (TObjectIterator<T> It; It; ++It)
+	// Fall back to an iterator with case-sensitive exact match.
+	if (!Type)
 	{
-		T* Type = *It;
-		if constexpr (std::is_same_v<T, UStruct>)
+		for (TObjectIterator<T> It; It; ++It)
 		{
-			if (Type && Type->IsA<UClass>())
+			T* Candidate = *It;
+			if constexpr (std::is_same_v<T, UStruct>)
 			{
-				continue;
+				if (!Candidate || Candidate->IsA<UClass>())
+				{
+					continue;
+				}
+			}
+			if (Candidate && Candidate->GetName().Equals(Token, ESearchCase::CaseSensitive))
+			{
+				Type = Candidate;
+				break;
 			}
 		}
-		if (Type && Type->GetName().Equals(Token, ESearchCase::CaseSensitive))
-		{
-			Cache.Add(Key, Type);
-			return Type;
-		}
 	}
-	return nullptr;
+
+	// Also cache misses (as invalid weak pointers) so repeated lookups of
+	// unknown names stay silent and cheap.
+	Cache.Add(Key, Type);
+	return Type;
 }
 
 // Generic Resolve implementation for all types
@@ -187,7 +193,9 @@ T* TTypeResolver<T>::Resolve(const FStringView& TokenView)
 	return ResolveShortName(Token);
 }
 
-// Explicit instantiation for UClass and UStruct
+// Explicit instantiation for all supported resolver types
 template class TTypeResolver<UClass>;
 template class TTypeResolver<UStruct>;
+template class TTypeResolver<UScriptStruct>;
+template class TTypeResolver<UEnum>;
 

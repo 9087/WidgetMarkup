@@ -23,8 +23,4 @@ private:
 	static bool ParseTypeInternal(const FString& InTypeText, FEdGraphPinType& OutPinType, FString& OutError, bool bAllowContainer);
 	static bool ParseMapContainer(const FString& InInnerText, FString& OutKeyText, FString& OutValueText, FString& OutError);
 	static FString NormalizeToken(const FString& InText);
-
-	/** Cache-backed type resolution — each short name hits TryFindTypeSlow at most once. */
-	template<typename T>
-	static T* TryResolveType(const FString& Token);
 };

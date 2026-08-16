@@ -3,39 +3,9 @@
 #include "TypeParser.h"
 
 #include "EdGraphSchema_K2.h"
+#include "TypeResolver.h"
 #include "UObject/Interface.h"
 #include "UObject/UObjectIterator.h"
-
-template<typename T>
-T* FTypeParser::TryResolveType(const FString& Token)
-{
-	// Cache: each short type name goes through TryFindTypeSlow at most once.
-	// Subsequent lookups hit the cache with zero warnings.
-	static TMap<FName, TWeakObjectPtr<UObject>> Cache;
-
-	const FName Key(*Token);
-	if (const TWeakObjectPtr<UObject>* Cached = Cache.Find(Key))
-	{
-		if (Cached->IsValid())
-		{
-			return Cast<T>(Cached->Get());
-		}
-		Cache.Remove(Key);
-	}
-
-	// TryFindTypeSlow — will warn for unknown types, but only once per name.
-	if (T* Result = UClass::TryFindTypeSlow<T>(Token, EFindFirstObjectOptions::None))
-	{
-		Cache.Add(Key, Result);
-		return Result;
-	}
-	return nullptr;
-}
-
-// Explicit template instantiation for the three types we resolve.
-template UClass* FTypeParser::TryResolveType<UClass>(const FString& Token);
-template UScriptStruct* FTypeParser::TryResolveType<UScriptStruct>(const FString& Token);
-template UEnum* FTypeParser::TryResolveType<UEnum>(const FString& Token);
 
 namespace
 {
@@ -89,15 +59,20 @@ UClass* FTypeParser::ResolveClass(const FString& InClassText)
 		return nullptr;
 	}
 
-	if (UClass* Class = TryResolveType<UClass>(Token))
+	if (UClass* Class = TTypeResolver<UClass>::Resolve(Token))
 	{
 		return Class;
 	}
 
-	const FString PrefixedToken = Token.StartsWith(TEXT("U"), ESearchCase::CaseSensitive) ? Token : FString(TEXT("U")) + Token;
-	if (UClass* Class = TryResolveType<UClass>(PrefixedToken))
+	// Prefix completion only makes sense for short names; dotted long tokens
+	// resolve through their own path above.
+	if (!Token.Contains(TEXT(".")))
 	{
-		return Class;
+		const FString PrefixedToken = Token.StartsWith(TEXT("U"), ESearchCase::CaseSensitive) ? Token : FString(TEXT("U")) + Token;
+		if (UClass* Class = TTypeResolver<UClass>::Resolve(PrefixedToken))
+		{
+			return Class;
+		}
 	}
 
 	for (TObjectIterator<UClass> It; It; ++It)
@@ -139,15 +114,20 @@ UScriptStruct* FTypeParser::ResolveStruct(const FString& InStructText)
 		return nullptr;
 	}
 
-	if (UScriptStruct* Struct = TryResolveType<UScriptStruct>(Token))
+	if (UScriptStruct* Struct = TTypeResolver<UScriptStruct>::Resolve(Token))
 	{
 		return Struct;
 	}
 
-	const FString PrefixedToken = Token.StartsWith(TEXT("F"), ESearchCase::CaseSensitive) ? Token : FString(TEXT("F")) + Token;
-	if (UScriptStruct* Struct = TryResolveType<UScriptStruct>(PrefixedToken))
+	// Prefix completion only makes sense for short names; dotted long tokens
+	// resolve through their own path above.
+	if (!Token.Contains(TEXT(".")))
 	{
-		return Struct;
+		const FString PrefixedToken = Token.StartsWith(TEXT("F"), ESearchCase::CaseSensitive) ? Token : FString(TEXT("F")) + Token;
+		if (UScriptStruct* Struct = TTypeResolver<UScriptStruct>::Resolve(PrefixedToken))
+		{
+			return Struct;
+		}
 	}
 
 	for (TObjectIterator<UScriptStruct> It; It; ++It)
@@ -179,15 +159,20 @@ UEnum* FTypeParser::ResolveEnum(const FString& InEnumText)
 		return nullptr;
 	}
 
-	if (UEnum* Enum = TryResolveType<UEnum>(Token))
+	if (UEnum* Enum = TTypeResolver<UEnum>::Resolve(Token))
 	{
 		return Enum;
 	}
 
-	const FString PrefixedToken = Token.StartsWith(TEXT("E"), ESearchCase::CaseSensitive) ? Token : FString(TEXT("E")) + Token;
-	if (UEnum* Enum = TryResolveType<UEnum>(PrefixedToken))
+	// Prefix completion only makes sense for short names; dotted long tokens
+	// resolve through their own path above.
+	if (!Token.Contains(TEXT(".")))
 	{
-		return Enum;
+		const FString PrefixedToken = Token.StartsWith(TEXT("E"), ESearchCase::CaseSensitive) ? Token : FString(TEXT("E")) + Token;
+		if (UEnum* Enum = TTypeResolver<UEnum>::Resolve(PrefixedToken))
+		{
+			return Enum;
+		}
 	}
 
 	for (TObjectIterator<UEnum> It; It; ++It)
