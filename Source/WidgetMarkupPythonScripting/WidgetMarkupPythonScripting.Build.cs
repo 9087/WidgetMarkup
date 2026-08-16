@@ -29,6 +29,7 @@ public class WidgetMarkupPythonScripting : ModuleRules
 			"InputCore",
 			"SlateCore",
 			"UMG",
+			"UMGEditor",
 			"Python3",
 			"PythonScriptPlugin",
 			"Projects",
