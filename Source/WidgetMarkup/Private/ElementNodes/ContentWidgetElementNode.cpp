@@ -5,8 +5,6 @@
 #include "Components/ContentWidget.h"
 #include "Components/Widget.h"
 
-#define LOCTEXT_NAMESPACE "WidgetMarkup"
-
 IMPLEMENT_ELEMENT_NODE(FContentWidgetElementNode, FPanelWidgetElementNode)
 
 TSharedRef<FElementNode> FContentWidgetElementNode::Create()
@@ -35,5 +33,3 @@ FElementNode::FResult FContentWidgetElementNode::OnAddChild(const TSharedRef<FEl
 	}
 	return FPanelWidgetElementNode::OnAddChild(Child);
 }
-
-#undef LOCTEXT_NAMESPACE

@@ -64,8 +64,6 @@
 #include "Interfaces/IPluginManager.h"
 #include "Misc/PackageName.h"
 
-#define LOCTEXT_NAMESPACE "WidgetMarkup"
-
 DEFINE_LOG_CATEGORY(LogWidgetMarkup);
 
 IWidgetMarkupScriptIntegration::IWidgetMarkupScriptIntegration(FWidgetMarkupModule& InWidgetMarkupModule)
@@ -1095,5 +1093,3 @@ static FAutoConsoleCommand GWidgetMarkupGenerateIntelliSenseData
 		FFileHelper::SaveStringToFile(OutputString, *FilePath);
 	})
 );
-
-#undef LOCTEXT_NAMESPACE
