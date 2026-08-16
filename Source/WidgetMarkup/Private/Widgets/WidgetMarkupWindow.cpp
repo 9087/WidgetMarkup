@@ -14,7 +14,7 @@
 #include "Widgets/SNullWidget.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/SVerticalBox.h"
+#include "Widgets/SBoxPanel.h"
 #include "Widgets/SWindow.h"
 #include "Widgets/Text/STextBlock.h"
 
