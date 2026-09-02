@@ -18,25 +18,27 @@ set /a TOTAL=0
 for /f "delims=" %%A in ('findstr /b /c:"call :run_test" /c:"call :run_negative_test" "%~f0"') do set /a TOTAL+=1
 set /a COUNT=0
 
-call :run_test "TestEmpty" "Empty widgetmarkup"
-call :run_test "TestReactive" "Reactive properties"
-call :run_test "TestComputed" "Computed properties"
-call :run_test "TestTextBlock" "TextBlock widget"
-call :run_test "TestButton" "Button widget"
-call :run_test "TestImage" "Image widget"
-call :run_test "TestBorder" "Border widget (single-child container)"
-call :run_test "TestCanvasPanel" "CanvasPanel widget"
-call :run_test "TestHorizontalBox" "HorizontalBox widget"
-call :run_test "TestVerticalBox" "VerticalBox widget"
-call :run_test "TestGridPanel" "GridPanel widget (ColumnFill/RowFill containers)"
-call :run_test "TestOverlay" "Overlay widget"
-call :run_test "TestStyleSheetInline" "StyleSheet (inline)"
-call :run_test "TestStyleSheetOverride" "StyleSheet (inherit standalone file + override)"
-call :run_test "TestListView" "ListView + ObservableCollection"
-call :run_test "TestDynamicChild" "Dynamic add_child / remove_child / get_child"
-call :run_test "TestStaticChild" "Static child widget blueprint + get_child / remove_child"
-call :run_test "TestVariable" "Variable element (defaults, types, brace literals)"
-call :run_negative_test "TestConflict" "Property value+children conflict (expected compile failure)"
+:: Every test call is followed by "|| exit /b 1" so a failing subroutine
+:: aborts the whole suite instead of continuing to "All tests passed."
+call :run_test "TestEmpty" "Empty widgetmarkup" || exit /b 1
+call :run_test "TestReactive" "Reactive properties" || exit /b 1
+call :run_test "TestComputed" "Computed properties" || exit /b 1
+call :run_test "TestTextBlock" "TextBlock widget" || exit /b 1
+call :run_test "TestButton" "Button widget" || exit /b 1
+call :run_test "TestImage" "Image widget" || exit /b 1
+call :run_test "TestBorder" "Border widget (single-child container)" || exit /b 1
+call :run_test "TestCanvasPanel" "CanvasPanel widget" || exit /b 1
+call :run_test "TestHorizontalBox" "HorizontalBox widget" || exit /b 1
+call :run_test "TestVerticalBox" "VerticalBox widget" || exit /b 1
+call :run_test "TestGridPanel" "GridPanel widget (ColumnFill/RowFill containers)" || exit /b 1
+call :run_test "TestOverlay" "Overlay widget" || exit /b 1
+call :run_test "TestStyleSheetInline" "StyleSheet (inline)" || exit /b 1
+call :run_test "TestStyleSheetOverride" "StyleSheet (inherit standalone file + override)" || exit /b 1
+call :run_test "TestListView" "ListView + ObservableCollection" || exit /b 1
+call :run_test "TestDynamicChild" "Dynamic add_child / remove_child / get_child" || exit /b 1
+call :run_test "TestStaticChild" "Static child widget blueprint + get_child / remove_child" || exit /b 1
+call :run_test "TestVariable" "Variable element (defaults, types, brace literals)" || exit /b 1
+call :run_negative_test "TestConflict" "Property value+children conflict (expected compile failure)" || exit /b 1
 
 echo.
 echo ========================================
