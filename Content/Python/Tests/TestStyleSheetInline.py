@@ -43,15 +43,16 @@ class TestStyleSheetInline(TestComponent):
             self.check_not_none(slot_label, "SlotStyled found")
             if slot_label:
                 # Slot.Padding resolves through an object pointer (unresolvable at compile time);
-                # the setter must be ignored with a warning, so Padding stays at its default.
+                # the setter must be ignored with a warning, so Offsets stays at its default.
                 self.check_equal(slot_label.get_editor_property("Text"), "slot styled text", "SlotStyled.Text")
                 slot = slot_label.slot
                 self.check_not_none(slot, "SlotStyled.Slot")
                 if slot:
-                    padding = slot.get_editor_property("Padding")
-                    self.check_not_none(padding, "SlotStyled.Slot.Padding")
-                    if padding:
-                        self.check_almost_equal(float(padding.left), 0.0, 0.001, "SlotStyled.Slot.Padding.Left (unresolvable setter ignored)")
+                    layout = slot.get_editor_property("LayoutData")
+                    self.check_not_none(layout, "SlotStyled.Slot.LayoutData")
+                    if layout:
+                        offsets = layout.offsets
+                        self.check_almost_equal(float(offsets.left), 0.0, 0.001, "SlotStyled.Slot.LayoutData.Offsets.Left (unresolvable setter ignored)")
 
             self.report()
         finally:

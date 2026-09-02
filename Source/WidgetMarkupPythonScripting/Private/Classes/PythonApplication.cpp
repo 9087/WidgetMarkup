@@ -11,7 +11,11 @@ namespace
 {
 	PyObject* PyRequestShutdown(PyObject* /*Self*/, PyObject* /*Args*/)
 	{
-		FPlatformMisc::RequestExit(true);
+		// Graceful exit: a forced exit would terminate the process immediately
+		// with a fixed status and mask any exit code reported by the script
+		// integration (e.g. test failures). The commandlet loop observes
+		// GIsRequestingExit and returns the real exit code.
+		FPlatformMisc::RequestExit(false);
 		Py_RETURN_NONE;
 	}
 
