@@ -105,6 +105,9 @@ public:
 	TSharedPtr<IPropertyRun> CreateCustomPropertyRun(UStruct* InStruct, FName InPropertyPath) const;
 	TSharedRef<IPropertyRun> CreatePropertyRun(UStruct* InStruct, FName InPropertyPath) const;
 
+	/** Returns the canonical names of custom property runs that apply to the given struct (e.g. "Script", "ListItems"). */
+	TArray<FName> GetCustomPropertyRunNames(UStruct* InStruct) const;
+
 	DECLARE_DELEGATE_RetVal(TSharedRef<FPropertySetter>, FOnCreatePropertySetter);
 	bool RegisterCustomPropertySetter(UStruct* InStruct, FName InPropertyPath, FOnCreatePropertySetter InOnCreatePropertySetter);
 	void UnregisterCustomPropertySetter(UStruct* InStruct, FName InPropertyPath);
@@ -160,6 +163,7 @@ public:
 	void StopSourceFileWatching();
 
 private:
+	void EnsureRemoteControlPreset();
 	void HandleOnSourceFileDirectoryChanged(const TArray<struct FFileChangeData>& FileChanges, const FString& WatchedDirectory);
 	void EnsureCompileDebounceTicker();
 	bool TickCompileDebounce(float DeltaSeconds);
@@ -171,6 +175,9 @@ private:
 	/** Package paths waiting to be recompiled after the debounce window. */
 	TSet<FName> PendingCompilePaths;
 	FTSTicker::FDelegateHandle CompileDebounceTickerHandle;
+
+	/** Remote Control preset exposing the attribute discovery library. */
+	TObjectPtr<class URemoteControlPreset> AttributePreset;
 
 public:
 	DECLARE_MULTICAST_DELEGATE(FOnInitialized);

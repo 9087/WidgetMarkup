@@ -49,6 +49,15 @@ public:
 
 	TSharedPtr<FElementNode> CreateElementNode(UObject* Outer, const FString& ElementName, const TCHAR* ElementData, UStruct*& Struct);
 
+	/**
+	 * Enumerates the markup element names registered with the factory as
+	 * (ElementName, UStruct*) pairs. Aliased registrations use their alias;
+	 * non-aliased non-abstract registrations use the struct/class name.
+	 * Abstract base registrations (e.g. UWidget) are creator dispatchers and
+	 * are skipped.
+	 */
+	void GetRegisteredElements(TArray<TPair<FString, UStruct*>>& OutElements) const;
+
 private:
 	UStruct* ResolveStructByAlias(const FString& ElementName);
 

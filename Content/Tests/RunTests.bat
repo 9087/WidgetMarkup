@@ -38,6 +38,7 @@ call :run_test "TestListView" "ListView + ObservableCollection" || exit /b 1
 call :run_test "TestDynamicChild" "Dynamic add_child / remove_child / get_child" || exit /b 1
 call :run_test "TestStaticChild" "Static child widget blueprint + get_child / remove_child" || exit /b 1
 call :run_test "TestVariable" "Variable element (defaults, types, brace literals)" || exit /b 1
+call :run_test "TestAttributes" "Attribute discovery (elements, attributes, nested paths)" || exit /b 1
 call :run_negative_test "TestConflict" "Property value+children conflict (expected compile failure)" || exit /b 1
 
 echo.

@@ -40,6 +40,7 @@ public class WidgetMarkup : ModuleRules
 			"DeveloperSettings",
 			"Json",
 			"Projects",
+			"RemoteControl",
 		});
 	}
 }

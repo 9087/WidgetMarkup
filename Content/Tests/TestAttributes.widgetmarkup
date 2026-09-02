@@ -1,0 +1,7 @@
+<WidgetBlueprint Script="Tests.TestAttributes">
+  <WidgetTree>
+    <CanvasPanel>
+      <Button Name="ProbeButton" />
+    </CanvasPanel>
+  </WidgetTree>
+</WidgetBlueprint>

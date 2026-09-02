@@ -70,6 +70,39 @@ UStruct* FElementNodeFactory::ResolveStructByAlias(const FString& ElementName)
 	return nullptr;
 }
 
+void FElementNodeFactory::GetRegisteredElements(TArray<TPair<FString, UStruct*>>& OutElements) const
+{
+	OutElements.Reset();
+
+	// Aliased registrations use their markup name (e.g. Variable, Pair).
+	for (const auto& Pair : AliasToStructMap)
+	{
+		if (UStruct* Struct = Pair.Value.Get())
+		{
+			OutElements.Add({ Pair.Key, Struct });
+		}
+	}
+
+	// Non-aliased registrations use the struct/class name, except abstract
+	// class registrations which only dispatch creators for subclasses.
+	for (const auto& Pair : CreateElementNodeDelegateMap)
+	{
+		UStruct* Struct = Pair.Key.Get();
+		if (!Struct)
+		{
+			continue;
+		}
+		if (const UClass* Class = Cast<UClass>(Struct))
+		{
+			if (Class->HasAnyClassFlags(CLASS_Abstract))
+			{
+				continue;
+			}
+		}
+		OutElements.Add({ Struct->GetName(), Struct });
+	}
+}
+
 TSharedPtr<FElementNode> FElementNodeFactory::CreateElementNode(UObject* Outer, const FString& ElementName, const TCHAR* ElementData, UStruct*& Struct)
 {
 	Struct = ResolveStructByAlias(ElementName);

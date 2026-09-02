@@ -9,7 +9,10 @@
 #include "WidgetBlueprint.h"
 #include "ElementTreeBuilder.h"
 #include "IDirectoryWatcher.h"
+#include "IRemoteControlModule.h"
+#include "RemoteControlPreset.h"
 #include "WidgetMarkupSettings.h"
+#include "WidgetMarkupLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Engine/Blueprint.h"
 #include "Components/ContentWidget.h"
@@ -214,6 +217,15 @@ void FWidgetMarkupModule::ShutdownModule()
 
 	FCoreDelegates::OnPostEngineInit.RemoveAll(this);
 	StopSourceFileWatching();
+
+	if (AttributePreset && FModuleManager::Get().IsModuleLoaded(TEXT("RemoteControl")))
+	{
+		IRemoteControlModule& RemoteControlModule = IRemoteControlModule::Get();
+		RemoteControlModule.UnregisterEmbeddedPreset(AttributePreset.Get());
+		RemoteControlModule.DestroyTransientPreset(AttributePreset->GetPresetId());
+	}
+	AttributePreset = nullptr;
+
 	if (CompileDebounceTickerHandle.IsValid())
 	{
 		FTSTicker::RemoveTicker(CompileDebounceTickerHandle);
@@ -313,6 +325,30 @@ TSharedPtr<IPropertyRun> FWidgetMarkupModule::CreateCustomPropertyRun(UStruct* I
 		return nullptr;
 	}
 	return BestDelegate->Execute();
+}
+
+TArray<FName> FWidgetMarkupModule::GetCustomPropertyRunNames(UStruct* InStruct) const
+{
+	TArray<FName> Names;
+	if (!InStruct)
+	{
+		return Names;
+	}
+
+	for (const auto& KeyValuePair : PropertyRunCreateDelegates)
+	{
+		UStruct* Struct = KeyValuePair.Key.Get();
+		if (!Struct || !InStruct->IsChildOf(Struct))
+		{
+			continue;
+		}
+
+		for (const auto& PathPair : KeyValuePair.Value)
+		{
+			Names.AddUnique(FName(*PathPair.Key.GetPathName().ToString()));
+		}
+	}
+	return Names;
 }
 
 TSharedRef<IPropertyRun> FWidgetMarkupModule::CreatePropertyRun(UStruct* InStruct, FName InPropertyPath) const
@@ -684,6 +720,49 @@ void FWidgetMarkupModule::UnregisterCustomPropertySetter(UStruct* InStruct, FNam
 void FWidgetMarkupModule::OnPostEngineInit()
 {
 	EnsureSourceFileWatching();
+	EnsureRemoteControlPreset();
+}
+
+void FWidgetMarkupModule::EnsureRemoteControlPreset()
+{
+	if (AttributePreset)
+	{
+		return;
+	}
+
+	// Web Remote Control only runs in the editor, but the preset machinery is
+	// harmless to skip anywhere the RemoteControl plugin is unavailable.
+	if (!FModuleManager::Get().LoadModule(TEXT("RemoteControl")))
+	{
+		UE_LOG(LogWidgetMarkup, Warning, TEXT("RemoteControl module is unavailable; attribute discovery will not be exposed over HTTP."));
+		return;
+	}
+
+	IRemoteControlModule& RemoteControlModule = IRemoteControlModule::Get();
+
+	URemoteControlPreset* Preset = RemoteControlModule.CreateTransientPreset();
+	if (!Preset)
+	{
+		UE_LOG(LogWidgetMarkup, Warning, TEXT("Could not create a transient Remote Control preset."));
+		return;
+	}
+	// The object name doubles as the preset name in Web Remote Control URLs.
+	Preset->Rename(TEXT("WidgetMarkup"), nullptr, REN_NonTransactional);
+
+	// Bind the stateless attribute library through its class default object.
+	UClass* LibraryClass = UWidgetMarkupLibrary::StaticClass();
+	Preset->ExposeFunction(LibraryClass->GetDefaultObject(), LibraryClass->FindFunctionByName(TEXT("GetElements")));
+	Preset->ExposeFunction(LibraryClass->GetDefaultObject(), LibraryClass->FindFunctionByName(TEXT("GetAttributes")));
+
+	if (!RemoteControlModule.RegisterEmbeddedPreset(Preset, /*bReplaceExisting=*/ true))
+	{
+		UE_LOG(LogWidgetMarkup, Warning, TEXT("Could not register the WidgetMarkup Remote Control preset."));
+		RemoteControlModule.DestroyTransientPreset(Preset->GetPresetId());
+		return;
+	}
+
+	AttributePreset = Preset;
+	UE_LOG(LogWidgetMarkup, Display, TEXT("Registered Remote Control preset 'WidgetMarkup' with GetElements and GetAttributes."));
 }
 
 void FWidgetMarkupModule::EnsureSourceFileWatching()
