@@ -4,6 +4,7 @@
 
 #include "ConverterRegistry.h"
 #include "DirectoryWatcherModule.h"
+#include "Editor.h"
 #include "ElementNodeFactory.h"
 #include "FastXml.h"
 #include "WidgetBlueprint.h"
@@ -730,6 +731,15 @@ void FWidgetMarkupModule::EnsureRemoteControlPreset()
 		return;
 	}
 
+	// ExposeFunction registers transaction listeners through the editor's
+	// transaction buffer (GEditor->Trans), which only exists in the editor;
+	// registering anywhere else would crash.
+	if (!GEditor || !GEditor->Trans)
+	{
+		UE_LOG(LogWidgetMarkup, Verbose, TEXT("Remote Control preset registration requires the editor transaction system; skipping."));
+		return;
+	}
+
 	// Web Remote Control only runs in the editor, but the preset machinery is
 	// harmless to skip anywhere the RemoteControl plugin is unavailable.
 	if (!FModuleManager::Get().LoadModule(TEXT("RemoteControl")))
@@ -750,9 +760,13 @@ void FWidgetMarkupModule::EnsureRemoteControlPreset()
 	Preset->Rename(TEXT("WidgetMarkup"), nullptr, REN_NonTransactional);
 
 	// Bind the stateless attribute library through its class default object.
+	// The Web Remote Control function-call route serializes struct return
+	// values into the "ReturnedValues" response array, so the struct-returning
+	// functions can be exposed directly. Explicit labels keep the URL path
+	// segments predictable (no spaces to URL-encode).
 	UClass* LibraryClass = UWidgetMarkupLibrary::StaticClass();
-	Preset->ExposeFunction(LibraryClass->GetDefaultObject(), LibraryClass->FindFunctionByName(TEXT("GetElements")));
-	Preset->ExposeFunction(LibraryClass->GetDefaultObject(), LibraryClass->FindFunctionByName(TEXT("GetAttributes")));
+	Preset->ExposeFunction(LibraryClass->GetDefaultObject(), LibraryClass->FindFunctionByName(TEXT("GetElements")), FRemoteControlPresetExposeArgs(TEXT("GetElements"), FGuid()));
+	Preset->ExposeFunction(LibraryClass->GetDefaultObject(), LibraryClass->FindFunctionByName(TEXT("GetAttributes")), FRemoteControlPresetExposeArgs(TEXT("GetAttributes"), FGuid()));
 
 	if (!RemoteControlModule.RegisterEmbeddedPreset(Preset, /*bReplaceExisting=*/ true))
 	{
@@ -763,6 +777,23 @@ void FWidgetMarkupModule::EnsureRemoteControlPreset()
 
 	AttributePreset = Preset;
 	UE_LOG(LogWidgetMarkup, Display, TEXT("Registered Remote Control preset 'WidgetMarkup' with GetElements and GetAttributes."));
+
+	// Verify the preset is resolvable through the embedded preset registry,
+	// which is exactly what the Web Remote Control HTTP handlers consult.
+	{
+		TArray<TWeakObjectPtr<URemoteControlPreset>> EmbeddedPresets;
+		IRemoteControlModule::Get().GetEmbeddedPresets(EmbeddedPresets);
+		bool bFound = false;
+		for (const TWeakObjectPtr<URemoteControlPreset>& EmbeddedPreset : EmbeddedPresets)
+		{
+			if (EmbeddedPreset.Get() == Preset)
+			{
+				bFound = true;
+				break;
+			}
+		}
+		UE_LOG(LogWidgetMarkup, Display, TEXT("Remote Control preset 'WidgetMarkup' %s in the embedded preset registry."), bFound ? TEXT("is present") : TEXT("IS MISSING"));
+	}
 }
 
 void FWidgetMarkupModule::EnsureSourceFileWatching()
