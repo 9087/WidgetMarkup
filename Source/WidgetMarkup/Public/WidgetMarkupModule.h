@@ -161,9 +161,9 @@ public:
 	void EnsureSourceFileWatching();
 	void StartSourceFileWatching(const FDirectoryPath& InDirectoryPath);
 	void StopSourceFileWatching();
+	void EnsureRemoteControlPreset();
 
 private:
-	void EnsureRemoteControlPreset();
 	void HandleOnSourceFileDirectoryChanged(const TArray<struct FFileChangeData>& FileChanges, const FString& WatchedDirectory);
 	void EnsureCompileDebounceTicker();
 	bool TickCompileDebounce(float DeltaSeconds);

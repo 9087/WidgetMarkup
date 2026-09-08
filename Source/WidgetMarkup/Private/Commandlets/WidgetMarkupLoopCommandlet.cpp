@@ -8,6 +8,8 @@
 #include "Framework/Application/SlateApplication.h"
 #include "HAL/PlatformProcess.h"
 #include "HAL/ThreadManager.h"
+#include "Interfaces/ISlateNullRendererModule.h"
+#include "Interfaces/ISlateRHIRendererModule.h"
 #include "Misc/CommandLine.h"
 #include "Misc/CoreDelegates.h"
 #include "Misc/PackageName.h"
@@ -15,7 +17,6 @@
 #include "Modules/ModuleManager.h"
 #include "RenderingThread.h"
 #include "Stats/Stats.h"
-#include "StandaloneRenderer.h"
 #include "UObject/GarbageCollection.h"
 #include "UObject/StrongObjectPtr.h"
 #include "WidgetMarkupModule.h"
@@ -63,8 +64,16 @@ int32 UWidgetMarkupLoopCommandlet::Main(const FString& Params)
 
 	if (!FSlateApplication::IsInitialized())
 	{
-		UE_LOG(LogWidgetMarkup, Display, TEXT("Initializing Slate as standalone application."));
-		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer());
+		// Render Slate through the engine RHI so the window rendering and any
+		// RHI-based off-screen rendering (e.g. FWidgetRenderer used by SlateBot
+		// screenshots) share the same renderer and font services. Fall back to
+		// the null renderer for headless runs (-nullrhi, e.g. the test suite).
+		const TSharedRef<FSlateRenderer> SlateRenderer = GUsingNullRHI
+			? FModuleManager::Get().LoadModuleChecked<ISlateNullRendererModule>("SlateNullRenderer").CreateSlateNullRenderer()
+			: FModuleManager::Get().LoadModuleChecked<ISlateRHIRendererModule>("SlateRHIRenderer").CreateSlateRHIRenderer();
+		UE_LOG(LogWidgetMarkup, Display, TEXT("Initializing Slate as standalone application (renderer: %s)."),
+			GUsingNullRHI ? TEXT("null") : TEXT("RHI"));
+		FSlateApplication::InitializeAsStandaloneApplication(SlateRenderer);
 
 		const bool bWasRunningCommandlet = PRIVATE_GIsRunningCommandlet;
 		PRIVATE_GIsRunningCommandlet = false;

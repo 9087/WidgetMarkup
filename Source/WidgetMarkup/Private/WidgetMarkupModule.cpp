@@ -5,6 +5,7 @@
 #include "ConverterRegistry.h"
 #include "DirectoryWatcherModule.h"
 #include "Editor.h"
+#include "Editor/TransBuffer.h"
 #include "ElementNodeFactory.h"
 #include "FastXml.h"
 #include "WidgetBlueprint.h"
@@ -731,14 +732,16 @@ void FWidgetMarkupModule::EnsureRemoteControlPreset()
 		return;
 	}
 
-	// ExposeFunction registers transaction listeners through the editor's
-	// transaction buffer (GEditor->Trans), which only exists in the editor;
-	// registering anywhere else would crash.
-	if (!GEditor || !GEditor->Trans)
+	// The preset layout registers undo/redo listeners on GEditor->Trans
+	// unconditionally. The standalone app creates a UEditorEngine (GIsEditor is
+	// true for commandlets with WITH_EDITORONLY_DATA) but not its transaction
+	// buffer, so create the buffer before exposing anything.
+#if WITH_EDITOR
+	if (GEditor && !GEditor->Trans)
 	{
-		UE_LOG(LogWidgetMarkup, Verbose, TEXT("Remote Control preset registration requires the editor transaction system; skipping."));
-		return;
+		GEditor->Trans = NewObject<UTransBuffer>(GEditor, TEXT("Trans"), RF_Transactional);
 	}
+#endif
 
 	// Web Remote Control only runs in the editor, but the preset machinery is
 	// harmless to skip anywhere the RemoteControl plugin is unavailable.
