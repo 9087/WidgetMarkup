@@ -127,8 +127,13 @@ bool UWidgetMarkupWindow::OpenWindow()
 		[SNullWidget::NullWidget];
 	NewWindow->SetOnWindowClosed(FOnWindowClosed::CreateUObject(this, &UWidgetMarkupWindow::HandleSlateWindowClosed));
 	SlateWindow = NewWindow;
-	FSlateApplication::Get().AddWindow(NewWindow);
+	// Build the content and resize BEFORE showing the window. Showing the
+	// window (AddWindow -> ShowWindow) creates the RHI viewport/swap chain at
+	// the window's current size; if shown while still empty (SNullWidget) the
+	// swap chain is created at ~8x40 and the later resize never reaches it,
+	// leaving the on-screen window permanently black.
 	RebuildWidget();
+	FSlateApplication::Get().AddWindow(NewWindow);
 	return true;
 }
 
@@ -165,6 +170,12 @@ void UWidgetMarkupWindow::RebuildWidget()
 					.AllowAudioPlayback(true)
 					.ShouldSimulatePhysics(true)
 				);
+				// This app runs as a standalone game (GEditor == null). FPreviewScene
+				// creates the preview world as EWorldType::Editor, whose
+				// ULevelInstanceSubsystem::Tick dereferences GEditor and crashes
+				// without it. Marking the world as a Game world skips that
+				// editor-only tick path.
+				PreviewScene->GetWorld()->WorldType = EWorldType::Game;
 			}
 			Widget = CreateWidget(PreviewScene->GetWorld(), WidgetClass);
 			if (Widget)
