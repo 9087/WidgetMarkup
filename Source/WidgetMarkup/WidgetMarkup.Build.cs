@@ -28,7 +28,6 @@ public class WidgetMarkup : ModuleRules
 			"CoreUObject",
 			"Engine",
 			"ApplicationCore",
-			"SlateNullRenderer",
 			"SlateRHIRenderer",
 			"Slate",
 			"UMG",
