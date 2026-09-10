@@ -3,7 +3,7 @@
   <WidgetTree>
     <CanvasPanel>
       <TextBlock Name="ChildText" Text="{display_text}" />
-      <Button Name="ChildButton" />
+      <Button Name="ChildButton" OnClicked="on_clicked" />
     </CanvasPanel>
   </WidgetTree>
 </WidgetBlueprint>

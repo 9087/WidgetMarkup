@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import weakref
 from typing import Any, Callable
 
 from ObservableCollection import ObservableCollection
@@ -340,16 +341,30 @@ class WidgetMarkupComponent:
             unreal.log_warning(f"WidgetMarkup: widget '{target_name}' not found in WidgetTree")
             return
 
-        python_method = function if callable(function) else getattr(self, function, None)
-        if python_method is None or not callable(python_method):
-            unreal.log_warning(f"WidgetMarkup: method '{function}' not found on component")
-            return
+        # Resolve the method only to validate it exists. The retained callable
+        # must NOT capture a bound method (which holds a strong reference to
+        # self), or the delegate proxy -> callable -> self chain keeps this
+        # component and its widget alive after removal, leaking on every
+        # add_child/remove_child cycle.
+        if callable(function):
+            method_name = None
+        else:
+            method_name = function
+            if not callable(getattr(self, function, None)):
+                unreal.log_warning(f"WidgetMarkup: method '{function}' not found on component")
+                return
+        self_ref = weakref.ref(self)
 
         # For FOnPointerEvent delegates, wrap the Python method in an adapter
         # that unpacks payload → (geometry, mouse_event) and writes reply back.
         if unreal.WidgetMarkupUserWidget.is_on_pointer_event(target_widget, delegate_name):
             def _pointer_event_adapter(payload):
-                result = python_method(payload.geometry, payload.mouse_event)
+                comp = self_ref()
+                if comp is None:
+                    payload.reply = widget_markup.WidgetLibrary.unhandled()
+                    return
+                method = function if method_name is None else getattr(comp, method_name)
+                result = method(payload.geometry, payload.mouse_event)
                 payload.reply = result
 
             pointer_delegate = unreal.WidgetMarkupOnPointerEvent()
@@ -392,10 +407,17 @@ class WidgetMarkupComponent:
             unreal.log_warning(f"WidgetMarkup: delegate '{delegate_name}' not found on '{target_name}', tried: {', '.join(tried_names)}")
             return
 
+        def _weak_callable(*args, **kwargs):
+            comp = self_ref()
+            if comp is None:
+                return None
+            method = function if method_name is None else getattr(comp, method_name)
+            return method(*args, **kwargs)
+
         if hasattr(delegate_attr, "bind_callable"):
-            delegate_attr.bind_callable(python_method)
+            delegate_attr.bind_callable(_weak_callable)
         elif hasattr(delegate_attr, "add_callable"):
-            delegate_attr.add_callable(python_method)
+            delegate_attr.add_callable(_weak_callable)
         else:
             unreal.log_warning(
                 f"WidgetMarkup: delegate '{delegate_name}' on '{target_name}' does not support bind_callable or add_callable"
@@ -501,7 +523,8 @@ class WidgetMarkupComponent:
         """Remove a child widget.
 
         Args:
-            child: The child widget name (str) or the child UWidget instance.
+            child: The child widget name (str), the child UWidget instance, or
+                the child's WidgetMarkupComponent.
 
         Returns:
             True if the child was found and removed, False otherwise.
@@ -510,16 +533,36 @@ class WidgetMarkupComponent:
         if user_widget is None:
             return False
 
+        # Resolve the child widget path and its Python component. The component
+        # holds the widget through _widget_markup_user_widget, while the widget's
+        # extension holds the component back, forming a cycle that keeps the
+        # widget reachable through the Python reference collector even after
+        # RemoveFromParent + MarkAsGarbage. Break that cycle before removal.
+        child_component = None
+        child_path = None
         if isinstance(child, str):
-            return widget_markup.WidgetLibrary.remove_child_widget(user_widget, child)
+            child_widget = self.find_widget(child)
+            child_path = str(child_widget.get_path_name()) if child_widget is not None else child
+            child_component = self.get_child(child)
+        else:
+            child_widget = getattr(child, _USER_WIDGET_ATTR, None)
+            if child_widget is not None:
+                child_path = str(child_widget.get_path_name())
+                child_component = child
+            else:
+                child_path = str(child.get_path_name())
+                child_component = widget_markup.Core.get_component_by_widget(child)
 
-        # Try to extract the UserWidget from a component.
-        child_widget = getattr(child, _USER_WIDGET_ATTR, None)
-        if child_widget is not None:
-            return widget_markup.WidgetLibrary.remove_child_widget(user_widget, str(child_widget.get_path_name()))
+        if child_component is not None:
+            if hasattr(child_component, _USER_WIDGET_ATTR):
+                try:
+                    delattr(child_component, _USER_WIDGET_ATTR)
+                except AttributeError:
+                    pass
+            if hasattr(child_component, "_delegate_keepalive"):
+                child_component._delegate_keepalive = []
 
-        # Assume child is already a UWidget.
-        return widget_markup.WidgetLibrary.remove_child_widget(user_widget, str(child.get_path_name()))
+        return widget_markup.WidgetLibrary.remove_child_widget(user_widget, child_path)
 
     def get_child(self, name: str) -> Any:
         """Get a child WidgetMarkupComponent by name.

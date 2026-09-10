@@ -245,6 +245,12 @@ namespace
 		}
 
 		ChildWidget->RemoveFromParent();
+
+		// Break the UWidget <-> SObjectWidget self-cycle so the removed widget is
+		// no longer reachable through its own Slate widget. Combined with the
+		// reference cleanup done in remove_child, this leaves the widget
+		// unreachable and it is collected by the engine GC.
+		ChildWidget->ReleaseSlateResources(true);
 		Py_RETURN_TRUE;
 	}
 

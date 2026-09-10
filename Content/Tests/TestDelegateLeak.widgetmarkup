@@ -1,0 +1,5 @@
+<WidgetBlueprint Script="Tests.TestDelegateLeak">
+  <WidgetTree>
+    <CanvasPanel Name="RootCanvas" />
+  </WidgetTree>
+</WidgetBlueprint>

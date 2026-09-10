@@ -8,3 +8,6 @@ class TestChild(WidgetMarkupComponent):
 
     def on_data_refresh(self, data):
         self.display_text = str(data)
+
+    def on_clicked(self) -> None:
+        pass
