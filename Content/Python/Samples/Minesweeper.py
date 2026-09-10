@@ -154,7 +154,7 @@ class Minesweeper(WidgetMarkupComponent):
 
     @staticmethod
     def _is_right_mouse_button(mouse_event: unreal.WidgetMarkupPointerEvent) -> bool:
-        key_name = mouse_event.effecting_button.get_editor_property("key_name")
+        key_name = mouse_event.effecting_button.get_editor_property("KeyName")
         return "RightMouseButton" in str(key_name)
 
     @property

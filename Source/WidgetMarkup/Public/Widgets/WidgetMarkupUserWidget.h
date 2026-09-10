@@ -142,6 +142,11 @@ class UWidgetMarkupOnPointerEventDelegate : public UObject
 	GENERATED_BODY()
 
 public:
+	// Must be a UPROPERTY so the engine GC keeps alive the UPythonCallableForDelegate
+	// proxy this delegate is bound to. The proxy is otherwise only weakly referenced
+	// (delegates hold a weak reference to their target object) and gets collected by
+	// the periodic GC (~60s), silently killing the Python-side pointer binding.
+	UPROPERTY()
 	FWidgetMarkupOnPointerEvent TargetDelegate;
 
 	UFUNCTION()
@@ -180,10 +185,11 @@ public:
 	static bool IsOnPointerEvent(UWidget* Widget, FName DelegateName);
 
 	/** Bind a native wrapper that converts FPointerEvent → FWidgetMarkupPointerEvent
-	 *  through reflection on the Widget's named delegate property.
+	 *  through reflection on the Widget's named delegate property. The transient
+	 *  delegate object is kept alive by this user widget instance.
 	 *  @return true if the delegate property was found and bound successfully. */
 	UFUNCTION(BlueprintCallable, Category = "WidgetMarkup")
-	static bool BindOnPointerEvent(UWidget* Widget, FName DelegateName, FWidgetMarkupOnPointerEvent NewDelegate);
+	bool BindOnPointerEvent(UWidget* Widget, FName DelegateName, FWidgetMarkupOnPointerEvent NewDelegate);
 
 	/** Broadcast when this entry is released from the owning list view. */
 	UPROPERTY(BlueprintAssignable, Category = "WidgetMarkup")
@@ -196,4 +202,12 @@ public:
 	/** Broadcast when the expansion state of this entry changes (TreeView only). */
 	UPROPERTY(BlueprintAssignable, Category = "WidgetMarkup")
 	FOnWidgetMarkupItemExpansionChanged OnItemExpansionChanged;
+
+private:
+	// Strong (UPROPERTY) references to the transient UWidgetMarkupOnPointerEventDelegate
+	// objects created by BindOnPointerEvent. They are bound to a widget's delegate
+	// only through an FScriptDelegate (a weak reference), so the GC must be able to
+	// reach them through this property or the binding silently dies.
+	UPROPERTY()
+	TArray<TObjectPtr<UWidgetMarkupOnPointerEventDelegate>> PointerEventDelegateKeepAlive;
 };

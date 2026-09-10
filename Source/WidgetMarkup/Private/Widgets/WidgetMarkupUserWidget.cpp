@@ -86,10 +86,19 @@ bool UWidgetMarkupUserWidget::IsOnPointerEvent(UWidget* Widget, FName DelegateNa
 
 bool UWidgetMarkupUserWidget::BindOnPointerEvent(UWidget* Widget, FName DelegateName, FWidgetMarkupOnPointerEvent NewDelegate)
 {
-	if (!Widget) return false;
+	if (!Widget)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("WidgetMarkup: BindOnPointerEvent FAILED (null widget, delegate=%s)."), *DelegateName.ToString());
+		return false;
+	}
 
 	FProperty* Property = Widget->GetClass()->FindPropertyByName(DelegateName);
-	if (!Property) return false;
+	if (!Property)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("WidgetMarkup: BindOnPointerEvent FAILED (property '%s' not found on '%s')."),
+			*DelegateName.ToString(), *Widget->GetClass()->GetName());
+		return false;
+	}
 
 	UWidgetMarkupOnPointerEventDelegate* Delegate = NewObject<UWidgetMarkupOnPointerEventDelegate>(Widget);
 	Delegate->TargetDelegate = NewDelegate;
@@ -98,22 +107,36 @@ bool UWidgetMarkupUserWidget::BindOnPointerEvent(UWidget* Widget, FName Delegate
 	ScriptDelegate.BindUFunction(Delegate,
 		GET_FUNCTION_NAME_CHECKED(UWidgetMarkupOnPointerEventDelegate, HandlePointerEvent));
 
+	bool bBoundReflected = false;
 	if (const FMulticastDelegateProperty* MulticastDelegate = CastField<FMulticastDelegateProperty>(Property))
 	{
 		const_cast<FMulticastScriptDelegate*>(
 			MulticastDelegate->GetMulticastDelegate(Widget))->AddUnique(ScriptDelegate);
-		return true;
+		bBoundReflected = true;
 	}
-
-	if (const FDelegateProperty* SingleDelegate = CastField<FDelegateProperty>(Property))
+	else if (const FDelegateProperty* SingleDelegate = CastField<FDelegateProperty>(Property))
 	{
 		FScriptDelegate* DelegateSlot = SingleDelegate->GetPropertyValuePtr_InContainer(Widget);
-		if (!DelegateSlot) return false;
+		if (!DelegateSlot)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("WidgetMarkup: BindOnPointerEvent FAILED (no single-delegate slot for '%s')."), *DelegateName.ToString());
+			return false;
+		}
 		*DelegateSlot = ScriptDelegate;
-		return true;
+		bBoundReflected = true;
 	}
 
-	return false;
+	if (!bBoundReflected)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("WidgetMarkup: BindOnPointerEvent FAILED (property '%s' is not a delegate)."), *DelegateName.ToString());
+		return false;
+	}
+
+	// Keep the delegate alive across GC (the reflection binding only holds a weak
+	// reference), then rely on the UMG reflection chain to invoke it.
+	PointerEventDelegateKeepAlive.Add(Delegate);
+
+	return true;
 }
 
 FEventReply FWidgetMarkupEventReply::ToReply() const

@@ -354,9 +354,20 @@ class WidgetMarkupComponent:
 
             pointer_delegate = unreal.WidgetMarkupOnPointerEvent()
             pointer_delegate.bind_callable(_pointer_event_adapter)
-            unreal.WidgetMarkupUserWidget.bind_on_pointer_event(
-                target_widget, delegate_name, pointer_delegate
-            )
+
+            user_widget = getattr(self, _USER_WIDGET_ATTR, None)
+            if user_widget is None:
+                unreal.log_warning(f"WidgetMarkup: user widget not available to bind '{delegate_name}'")
+                return
+            user_widget.bind_on_pointer_event(target_widget, delegate_name, pointer_delegate)
+
+            # Keep the Python delegate wrapper alive. The wrapper's reference
+            # collector keeps the underlying UPythonCallableForDelegate proxy
+            # reachable across GC; delegates only hold a weak reference to that
+            # proxy, so without this the binding silently dies after ~60s.
+            if not hasattr(self, "_delegate_keepalive"):
+                self._delegate_keepalive = []
+            self._delegate_keepalive.append(pointer_delegate)
             return
 
         # Try C++ name first (OnClicked), then snake_case fallback (on_clicked),
@@ -389,6 +400,14 @@ class WidgetMarkupComponent:
             unreal.log_warning(
                 f"WidgetMarkup: delegate '{delegate_name}' on '{target_name}' does not support bind_callable or add_callable"
             )
+            return
+
+        # Keep the Python delegate wrapper alive across GC (same reason as the
+        # pointer-event branch above: the wrapper's reference collector keeps the
+        # UPythonCallableForDelegate proxy reachable).
+        if not hasattr(self, "_delegate_keepalive"):
+            self._delegate_keepalive = []
+        self._delegate_keepalive.append(delegate_attr)
 
     def prime_computed_dependencies(self) -> None:
         """Warm up computed dependencies after the owner finishes initialization.
