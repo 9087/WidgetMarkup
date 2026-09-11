@@ -1,3 +1,4 @@
+import unreal
 import widget_markup
 from Tests.TestComponent import TestComponent
 
@@ -69,6 +70,13 @@ class TestStarshipStyle(TestComponent):
                 normal_brush = danger.get_editor_property("WidgetStyle").get_editor_property("Normal")
                 tint = normal_brush.get_editor_property("TintColor").get_editor_property("SpecifiedColor")
                 self.check_almost_equal(float(tint.r), 0.5609, 0.002, "FlatButton.Danger Normal tint R")
+                # The derived style must win over its Base: FlatButton sets
+                # Normal.DrawAs = NoDrawType, FlatButton.Danger sets RoundedBox.
+                # Without this check a Base that overrides the derived style
+                # (wrong layering order) only shows up in a screenshot.
+                draw_as = normal_brush.get_editor_property("DrawAs")
+                self.check_equal(draw_as, unreal.SlateBrushDrawType.ROUNDED_BOX,
+                                 f"FlatButton.Danger Normal.DrawAs (derived overrides Base), got {draw_as}")
 
             # SimpleSharpButton has its own tight padding.
             sharp = self.find_widget("SimpleSharpButton")

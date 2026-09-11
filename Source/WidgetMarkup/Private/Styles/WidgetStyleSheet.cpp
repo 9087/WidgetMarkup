@@ -180,7 +180,10 @@ void UWidgetStyleSheet::ExpandBaseStyles()
 			Visited.Add(NextBase);
 			NextBase = Found->Base;
 		}
-		Chain.Add(&Entry);
+		// The entry is the nearest layer, so it goes first: walking the array
+		// backwards then lays the base-most style down first and applies the
+		// entry's own setters last, which is what makes them win.
+		Chain.Insert(&Entry, 0);
 
 		TArray<FWidgetStyleSetter> Merged;
 		for (int32 LayerIndex = Chain.Num() - 1; LayerIndex >= 0; --LayerIndex)
