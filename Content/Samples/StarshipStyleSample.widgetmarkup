@@ -1,0 +1,108 @@
+<WidgetBlueprint Script="Samples.StarshipStyleSample">
+  <!-- Inherit the editor layer, which inherits the core layer in turn. -->
+  <StyleSheet Inherit="/WidgetMarkup/Core/Styles/StarshipStyle" />
+  <WidgetTree>
+    <SlateBot InstanceName="StarshipStyleSample">
+      <SizeBox WidthOverride="560" HeightOverride="720">
+      <Border BrushColor="0.11,0.11,0.13,1" Padding="16,16,16,16">
+        <VerticalBox>
+
+          <TextBlock Style="NormalText.Important" Text="StarshipStyle" Slot.Padding="0,0,0,2" />
+          <TextBlock Style="NormalText.Subdued" Text="WidgetMarkup framework style sheets" Slot.Padding="0,0,0,14" />
+
+          <TextBlock Style="SmallText" Text="Buttons (core layer)" Slot.Padding="0,0,0,6" />
+          <HorizontalBox Slot.Padding="0,0,0,8">
+            <Button Style="PrimaryButton" Slot.Padding="0,0,8,0">
+              <TextBlock Text="PrimaryButton" />
+            </Button>
+            <Button Slot.Padding="0,0,8,0">
+              <TextBlock Text="Button" />
+            </Button>
+            <Button Style="SimpleButton">
+              <TextBlock Text="SimpleButton" />
+            </Button>
+          </HorizontalBox>
+
+          <TextBlock Style="SmallText" Text="Buttons (editor layer)" Slot.Padding="0,0,0,6" />
+          <HorizontalBox Slot.Padding="0,0,0,8">
+            <Button Style="FlatButton" Slot.Padding="0,0,8,0">
+              <TextBlock Text="FlatButton" />
+            </Button>
+            <Button Style="SimpleSharpButton" Slot.Padding="0,0,8,0">
+              <TextBlock Text="SimpleSharp" />
+            </Button>
+            <Button Style="SimpleRoundButton" Slot.Padding="0,0,8,0">
+              <TextBlock Text="SimpleRound" />
+            </Button>
+            <Button Style="ToggleButton">
+              <TextBlock Text="Toggle" />
+            </Button>
+          </HorizontalBox>
+          <HorizontalBox Slot.Padding="0,0,0,14">
+            <Button Style="FlatButton.Primary" Slot.Padding="0,0,8,0">
+              <TextBlock Text=".Primary" />
+            </Button>
+            <Button Style="FlatButton.Success" Slot.Padding="0,0,8,0">
+              <TextBlock Text=".Success" />
+            </Button>
+            <Button Style="FlatButton.Warning" Slot.Padding="0,0,8,0">
+              <TextBlock Text=".Warning" />
+            </Button>
+            <Button Style="FlatButton.Danger">
+              <TextBlock Text=".Danger" />
+            </Button>
+          </HorizontalBox>
+
+          <TextBlock Style="SmallText" Text="Inputs" Slot.Padding="0,0,0,6" />
+          <SizeBox HeightOverride="26" Slot.Padding="0,0,0,8">
+            <EditableTextBox HintText="type here" />
+          </SizeBox>
+          <!-- 已知差异：引擎的 SComboBox 内容区是独立的 TextBlock，所以参考示例里
+               下拉框能显示文字；UMG 的 UComboBoxString 只有在 DefaultOptions 里
+               能找到该选项时才画文字（UComboBoxString.cpp:InitialIndex），而
+               WidgetMarkup 目前不支持数组属性，所以这里只有框和箭头、没有文字。 -->
+          <SizeBox HeightOverride="26" Slot.Padding="0,0,0,8">
+            <ComboBoxString SelectedOption="ComboBox" />
+          </SizeBox>
+          <SizeBox HeightOverride="26" Slot.Padding="0,0,0,8">
+            <ComboBoxString Style="ToolbarComboButton" SelectedOption="ToolbarComboButton" />
+          </SizeBox>
+          <SizeBox HeightOverride="26" Slot.Padding="0,0,0,14">
+            <SpinBox Value="42" />
+          </SizeBox>
+
+          <TextBlock Style="SmallText" Text="Toggles and ranges" Slot.Padding="0,0,0,6" />
+          <!-- 纵向居中与 Slate 参考一致：UMG 的 HorizontalBox::Slot 默认是 Fill，
+               那一行里的文字/开关会被拉伸到整行高（比参考高 5px、内容上移 3px）。 -->
+          <HorizontalBox Slot.Padding="0,0,0,10">
+            <CheckBox Slot.Padding="0,0,8,0" />
+            <TextBlock Text="CheckBox" Slot.Padding="0,0,20,0" Slot.VerticalAlignment="VAlign_Center" />
+            <CheckBox Style="CheckboxLookToggleButtonCheckbox" Slot.Padding="0,0,8,0" />
+            <TextBlock Text="ToggleButton look" Slot.Padding="0,0,20,0" Slot.VerticalAlignment="VAlign_Center" />
+            <SizeBox WidthOverride="160" HeightOverride="20" Slot.VerticalAlignment="VAlign_Center">
+              <Slider Value="0.4" />
+            </SizeBox>
+          </HorizontalBox>
+          <ProgressBar Percent="0.65" Slot.Padding="0,0,0,14" />
+
+          <TextBlock Style="SmallText" Text="Text (core + editor layers)" Slot.Padding="0,0,0,6" />
+          <HorizontalBox Slot.Padding="0,0,0,6">
+            <TextBlock Text="NormalText" Slot.Padding="0,0,14,0" />
+            <TextBlock Style="NormalText.Subdued" Text="Subdued" Slot.Padding="0,0,14,0" />
+            <TextBlock Style="TextBlock.ShadowedTextWarning" Text="Warning" Slot.Padding="0,0,14,0" />
+            <TextBlock Style="Error" Text="Error" Slot.Padding="0,0,14,0" />
+            <TextBlock Style="Success" Text="Success" />
+          </HorizontalBox>
+          <HorizontalBox Slot.Padding="0,0,0,4">
+            <TextBlock Style="TinyText" Text="TinyText" Slot.Padding="0,0,14,0" />
+            <TextBlock Style="SmallText" Text="SmallText" Slot.Padding="0,0,14,0" />
+            <TextBlock Style="LargeText" Text="LargeText" Slot.Padding="0,0,14,0" />
+            <TextBlock Style="TextBlock.ShadowedText" Text="ShadowedText" />
+          </HorizontalBox>
+
+        </VerticalBox>
+      </Border>
+      </SizeBox>
+    </SlateBot>
+  </WidgetTree>
+</WidgetBlueprint>

@@ -1,0 +1,587 @@
+<!--
+  StarshipCoreStyle — WidgetMarkup 通用样式表（框架提供）
+
+  对应引擎 Runtime/SlateCore/Private/Styling/StarshipCoreStyle.cpp 的 "CoreStyle"
+  样式集。条目名与引擎一致，取值尽量按源码逐条对齐：颜色、圆角半径、描边、
+  内边距都抄自引擎（半径/描边常量见 Styling/CoreStyle.h：
+  ButtonMargins(12,1.5,12,1.5)、PressedButtonMargins(12,2.5,12,0.5)、
+  ComboButtonMargin(8,1,8,1)、InputFocusRadius=4、InputFocusThickness=1）。
+
+  用法：
+    <StyleSheet Inherit="/WidgetMarkup/Core/Styles/StarshipCoreStyle" />
+
+  与引擎仍存在的差异（无法表达，见 StarshipStyle.widgetmarkup 头部说明）：
+  - 引擎画刷多为「贴图 × 白色 tint」（BOX_BRUSH/IMAGE_BRUSH_SVG），这里只能用
+    纯色圆角近似，因此缺少贴图带来的描边细节与明暗；
+  - FTextBlockStyle 的 HighlightColor/UnderlineBrush 等不是 UMG 控件属性；
+  - 引擎用 FSlateColor::UseForeground() 的动态前景色，UMG 侧靠
+    ColorAndOpacity.ColorUseRule=UseColor_Foreground 表达。
+
+  实现要点（都是踩过的坑）：
+  - UMG 控件的默认样式里，画刷往往还挂着引擎贴图（ResourceName，例如
+    Common/TextBox.png、ProgressBar_Background.png）且 ImageType=FullColor。
+    只改 DrawAs/TintColor 的话，贴图颜色与 alpha 仍参与渲染（表现为输入框发灰、
+    进度条填充被压暗、滑条手柄偏暗、下拉箭头变成一个灰方块）。所以本表每个纯色
+    画刷都显式写了 ImageType=NoImage + ResourceName=None，把贴图彻底摘掉。
+  - 圆角要同时写 OutlineSettings.RoundingType 和 CornerRadii；引擎画刷默认是
+    HalfHeightRadius（半高），圆形手柄用这个即可。
+  - 引擎用 SVG（矢量画刷）的地方，可以直接用 ImageType=Vector + ResourceName
+    指向引擎的 .svg（见下拉框下箭头）。
+  - Core 层的隐式按钮条目会给所有 SButton 加 1px 描边，编辑器层的按钮条目必须
+    显式写 OutlineSettings.Width=0 才能去掉它。
+-->
+<StyleSheet>
+
+  <!-- ==================== 文本 TextBlock ==================== -->
+
+  <!-- 隐式：引擎条目名 NormalText（StyleFonts.Normal = FONT(10, "Regular")，前景色 UseForeground）
+       UseForeground = 动态前景色：控件在按钮内容里就跟随 FButtonStyle 的
+       Normal/Hovered/PressedForeground。引擎的按钮文字因此是白色，写成固定色做不到。
+       两个必须显式写、否则会和引擎差 1px 的坑：
+       - TypefaceFontName：UMG 的 UTextBlock 默认字体是
+         FSlateFontInfo(/Engine/EngineFonts/Roboto, 24, "Bold")，不写就是粗体；
+       - ShadowOffset：UMG 的 UTextBlock 默认 (1,1)（阴影颜色是透明的，看不见，
+         但 STextBlock::ComputeDesiredSize 会把 ShadowOffset 加进期望尺寸），
+         引擎的 NormalText 明确 SetShadowOffset(ZeroVector)，这里必须跟着清零。 -->
+  <Style TargetType="TextBlock">
+    <Setter Property="ColorAndOpacity.ColorUseRule" Value="UseColor_Foreground" />
+    <Setter Property="Font.TypefaceFontName" Value="Regular" />
+    <Setter Property="Font.Size" Value="10" />
+    <Setter Property="ShadowOffset" Value="0,0" />
+  </Style>
+
+  <Style TargetType="TextBlock" Name="SmallText">
+    <Setter Property="ColorAndOpacity" Value="Foreground" />
+    <Setter Property="Font.TypefaceFontName" Value="Regular" />
+    <Setter Property="Font.Size" Value="8" />
+    <Setter Property="ShadowOffset" Value="0,0" />
+  </Style>
+
+  <Style TargetType="TextBlock" Name="Text.Large">
+    <Setter Property="ColorAndOpacity" Value="Foreground" />
+    <Setter Property="Font.TypefaceFontName" Value="Regular" />
+    <Setter Property="Font.Size" Value="14" />
+    <Setter Property="ShadowOffset" Value="0,0" />
+  </Style>
+
+  <!-- ==================== 按钮 Button ==================== -->
+
+  <!-- 隐式：引擎条目名 Button
+       FSlateRoundedBoxBrush(color, 4.0f, FStyleColors::Input, InputFocusThickness)
+       padding 用 ButtonMargins / PressedButtonMargins -->
+  <Style TargetType="Button">
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Normal.TintColor" Value="Secondary" />
+    <Setter Property="WidgetStyle.Normal.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Normal.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.Normal.OutlineSettings.Color" Value="Input" />
+    <Setter Property="WidgetStyle.Normal.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.Hovered.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Hovered.TintColor" Value="Hover" />
+    <Setter Property="WidgetStyle.Hovered.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Hovered.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.Hovered.OutlineSettings.Color" Value="Input" />
+    <Setter Property="WidgetStyle.Hovered.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.Pressed.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Pressed.TintColor" Value="Header" />
+    <Setter Property="WidgetStyle.Pressed.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Pressed.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.Pressed.OutlineSettings.Color" Value="Input" />
+    <Setter Property="WidgetStyle.Pressed.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.Disabled.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.Disabled.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.Disabled.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Disabled.TintColor" Value="Dropdown" />
+    <Setter Property="WidgetStyle.Disabled.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Disabled.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.Disabled.OutlineSettings.Color" Value="Recessed" />
+    <Setter Property="WidgetStyle.Disabled.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.NormalForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.HoveredForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.PressedForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.DisabledForeground" Value="Foreground" />
+
+    <Setter Property="WidgetStyle.NormalPadding" Value="12,1.5,12,1.5" />
+    <Setter Property="WidgetStyle.PressedPadding" Value="12,2.5,12,0.5" />
+  </Style>
+
+  <Style TargetType="Button" Name="PrimaryButton">
+    <Setter Property="WidgetStyle.Normal.TintColor" Value="Primary" />
+    <Setter Property="WidgetStyle.Normal.OutlineSettings.Color" Value="Input" />
+    <Setter Property="WidgetStyle.Hovered.TintColor" Value="PrimaryHover" />
+    <Setter Property="WidgetStyle.Hovered.OutlineSettings.Color" Value="Input" />
+    <Setter Property="WidgetStyle.Pressed.TintColor" Value="PrimaryPress" />
+    <Setter Property="WidgetStyle.Pressed.OutlineSettings.Color" Value="Input" />
+    <Setter Property="WidgetStyle.Disabled.TintColor" Value="Dropdown" />
+    <Setter Property="WidgetStyle.Disabled.OutlineSettings.Color" Value="Recessed" />
+
+    <Setter Property="WidgetStyle.NormalForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.HoveredForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.PressedForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.DisabledForeground" Value="Foreground" />
+
+    <Setter Property="WidgetStyle.NormalPadding" Value="12,1.5,12,1.5" />
+    <Setter Property="WidgetStyle.PressedPadding" Value="12,2.5,12,0.5" />
+  </Style>
+
+  <!-- 引擎 SecondaryButton 就是 Button（同名另存），隐式条目已经提供了全部取值 -->
+  <Style TargetType="Button" Name="SecondaryButton" />
+
+  <!-- 引擎 SimpleButton = SimpleButtonIconOnly：
+       Normal/Disabled 无底色，Hover/Pressed = 圆角 4 的 Dropdown，且没有描边。
+       注意隐式 Button 条目作用于所有 Button，所以这里必须把 Normal/Disabled
+       显式改成 NoDrawType 才能"退出"隐式的底色。 -->
+  <Style TargetType="Button" Name="SimpleButton">
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="NoDrawType" />
+    <Setter Property="WidgetStyle.Disabled.DrawAs" Value="NoDrawType" />
+
+    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.Hovered.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Hovered.TintColor" Value="Dropdown" />
+    <Setter Property="WidgetStyle.Hovered.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Hovered.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.Hovered.OutlineSettings.Width" Value="0" />
+
+    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.Pressed.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Pressed.TintColor" Value="Dropdown" />
+    <Setter Property="WidgetStyle.Pressed.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Pressed.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.Pressed.OutlineSettings.Width" Value="0" />
+
+    <Setter Property="WidgetStyle.NormalForeground" Value="Foreground" />
+    <Setter Property="WidgetStyle.HoveredForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.PressedForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.DisabledForeground" Value="Foreground" />
+
+    <Setter Property="WidgetStyle.NormalPadding" Value="2,1,2,1" />
+    <Setter Property="WidgetStyle.PressedPadding" Value="2,2,2,0" />
+  </Style>
+
+  <!-- ==================== 复选框 CheckBox ==================== -->
+
+  <!-- 隐式：引擎条目名 Checkbox。底框是 FSlateRoundedBoxBrush(Input, 3, Secondary, 1)；
+       勾选图形引擎用 SVG 贴图，这里用 Primary 纯色圆角方块近似。 -->
+  <Style TargetType="CheckBox">
+    <Setter Property="WidgetStyle.UncheckedImage.DrawAs" Value="NoDrawType" />
+
+    <Setter Property="WidgetStyle.CheckedImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.CheckedImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.CheckedImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.CheckedImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.CheckedImage.TintColor" Value="Primary" />
+    <Setter Property="WidgetStyle.CheckedImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.CheckedImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.CheckedImage.OutlineSettings.CornerRadii" Value="2,2,2,2" />
+    <Setter Property="WidgetStyle.CheckedHoveredImage.TintColor" Value="PrimaryHover" />
+    <Setter Property="WidgetStyle.CheckedHoveredImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.CheckedPressedImage.TintColor" Value="PrimaryPress" />
+    <Setter Property="WidgetStyle.CheckedPressedImage.OutlineSettings.Width" Value="0" />
+
+    <Setter Property="WidgetStyle.UndeterminedImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.UndeterminedImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.UndeterminedImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.UndeterminedImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.UndeterminedImage.TintColor" Value="Primary" />
+    <Setter Property="WidgetStyle.UndeterminedImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.UndeterminedImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.UndeterminedImage.OutlineSettings.CornerRadii" Value="2,2,2,2" />
+
+    <Setter Property="WidgetStyle.BackgroundImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.BackgroundImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.BackgroundImage.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.TintColor" Value="Input" />
+
+    <Setter Property="WidgetStyle.BackgroundImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.BackgroundImage.OutlineSettings.CornerRadii" Value="3,3,3,3" />
+    <Setter Property="WidgetStyle.BackgroundImage.OutlineSettings.Color" Value="Secondary" />
+    <Setter Property="WidgetStyle.BackgroundImage.OutlineSettings.Width" Value="1" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.OutlineSettings.CornerRadii" Value="3,3,3,3" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.OutlineSettings.Color" Value="Hover" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.OutlineSettings.Width" Value="1" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.OutlineSettings.CornerRadii" Value="3,3,3,3" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.OutlineSettings.Color" Value="Hover" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.BackgroundImage.ImageSize" Value="18,18" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.ImageSize" Value="18,18" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.ImageSize" Value="18,18" />
+    <Setter Property="WidgetStyle.CheckedImage.ImageSize" Value="16,16" />
+
+    <Setter Property="WidgetStyle.ForegroundColor" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.HoveredForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.PressedForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.CheckedForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.CheckedHoveredForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.CheckedPressedForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.UndeterminedForeground" Value="ForegroundHover" />
+  </Style>
+
+  <!-- ==================== 输入框 EditableTextBox ==================== -->
+
+  <!-- 隐式：引擎条目名 NormalEditableTextBox
+       FSlateRoundedBoxBrush(Input, InputFocusRadius, <边框色>, InputFocusThickness) -->
+  <Style TargetType="EditableTextBox">
+    <Setter Property="WidgetStyle.BackgroundImageNormal.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.BackgroundImageNormal.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundImageNormal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundImageNormal.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.BackgroundImageNormal.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.BackgroundImageNormal.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.BackgroundImageNormal.OutlineSettings.Color" Value="InputOutline" />
+    <Setter Property="WidgetStyle.BackgroundImageNormal.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.BackgroundImageHovered.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.BackgroundImageHovered.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundImageHovered.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundImageHovered.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.BackgroundImageHovered.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.BackgroundImageHovered.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.BackgroundImageHovered.OutlineSettings.Color" Value="Hover" />
+    <Setter Property="WidgetStyle.BackgroundImageHovered.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.BackgroundImageFocused.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.BackgroundImageFocused.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundImageFocused.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundImageFocused.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.BackgroundImageFocused.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.BackgroundImageFocused.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.BackgroundImageFocused.OutlineSettings.Color" Value="Primary" />
+    <Setter Property="WidgetStyle.BackgroundImageFocused.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.BackgroundImageReadOnly.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.BackgroundImageReadOnly.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundImageReadOnly.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundImageReadOnly.TintColor" Value="Header" />
+    <Setter Property="WidgetStyle.BackgroundImageReadOnly.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.BackgroundImageReadOnly.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.BackgroundImageReadOnly.OutlineSettings.Color" Value="InputOutline" />
+    <Setter Property="WidgetStyle.BackgroundImageReadOnly.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.ForegroundColor" Value="Foreground" />
+    <Setter Property="WidgetStyle.BackgroundColor" Value="White" />
+    <Setter Property="WidgetStyle.FocusedForegroundColor" Value="White" />
+    <Setter Property="WidgetStyle.Padding" Value="8,3,8,4" />
+    <!-- Hint/typed text comes from the style's own text style; without this it
+         falls back to the Slate default font (~24px) and overflows the box. -->
+    <Setter Property="WidgetStyle.TextStyle.Font.Size" Value="10" />
+    <Setter Property="WidgetStyle.TextStyle.ColorAndOpacity" Value="Foreground" />
+  </Style>
+
+  <!-- ==================== 滚动条 ScrollBar ==================== -->
+
+  <!-- 隐式：引擎条目名 Scrollbar
+       FSlateRoundedBoxBrush(Hover/Hover2, 4.0f) 的滑块，Thickness 8 -->
+  <Style TargetType="ScrollBar">
+    <Setter Property="WidgetStyle.NormalThumbImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.NormalThumbImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.NormalThumbImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.NormalThumbImage.TintColor" Value="Hover" />
+    <Setter Property="WidgetStyle.NormalThumbImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.NormalThumbImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.NormalThumbImage.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+
+    <Setter Property="WidgetStyle.HoveredThumbImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.TintColor" Value="Hover2" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+
+    <Setter Property="WidgetStyle.DraggedThumbImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.DraggedThumbImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.DraggedThumbImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.DraggedThumbImage.TintColor" Value="Hover2" />
+    <Setter Property="WidgetStyle.DraggedThumbImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.DraggedThumbImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.DraggedThumbImage.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+
+    <Setter Property="WidgetStyle.Thickness" Value="8" />
+  </Style>
+
+  <!-- ==================== 滑块 Slider ==================== -->
+
+  <!-- 隐式：引擎条目名 Slider
+       Bar = FSlateRoundedBoxBrush(Input, 2.0f, <描边>, 1.0f)
+       Thumb = FSlateRoundedBoxBrush(Foreground, Icon8x8)（8x8 半径 => 圆形手柄） -->
+  <Style TargetType="Slider">
+    <Setter Property="WidgetStyle.NormalBarImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.NormalBarImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.NormalBarImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.NormalBarImage.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.NormalBarImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.NormalBarImage.OutlineSettings.CornerRadii" Value="2,2,2,2" />
+    <Setter Property="WidgetStyle.NormalBarImage.OutlineSettings.Color" Value="Input" />
+    <Setter Property="WidgetStyle.NormalBarImage.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.HoveredBarImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.HoveredBarImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.HoveredBarImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.HoveredBarImage.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.HoveredBarImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.HoveredBarImage.OutlineSettings.CornerRadii" Value="2,2,2,2" />
+    <Setter Property="WidgetStyle.HoveredBarImage.OutlineSettings.Color" Value="Input" />
+    <Setter Property="WidgetStyle.HoveredBarImage.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.DisabledBarImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.DisabledBarImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.DisabledBarImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.DisabledBarImage.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.DisabledBarImage.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.DisabledBarImage.OutlineSettings.CornerRadii" Value="2,2,2,2" />
+    <Setter Property="WidgetStyle.DisabledBarImage.OutlineSettings.Color" Value="Recessed" />
+    <Setter Property="WidgetStyle.DisabledBarImage.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.NormalThumbImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.NormalThumbImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.NormalThumbImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.NormalThumbImage.TintColor" Value="Foreground" />
+    <!-- 引擎是 FSlateRoundedBoxBrush(Foreground, Icon8x8)，用的是默认
+         RoundingType=HalfHeightRadius：8x8 的刷子按半高取圆角，正好是圆形手柄。 -->
+    <Setter Property="WidgetStyle.NormalThumbImage.OutlineSettings.RoundingType" Value="HalfHeightRadius" />
+    <Setter Property="WidgetStyle.NormalThumbImage.OutlineSettings.CornerRadii" Value="0,0,0,0" />
+    <Setter Property="WidgetStyle.NormalThumbImage.ImageSize" Value="8,8" />
+
+    <Setter Property="WidgetStyle.HoveredThumbImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.TintColor" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.OutlineSettings.RoundingType" Value="HalfHeightRadius" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.OutlineSettings.CornerRadii" Value="0,0,0,0" />
+    <Setter Property="WidgetStyle.HoveredThumbImage.ImageSize" Value="8,8" />
+
+    <Setter Property="WidgetStyle.DisabledThumbImage.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.DisabledThumbImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.DisabledThumbImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.DisabledThumbImage.TintColor" Value="Foreground" />
+    <Setter Property="WidgetStyle.DisabledThumbImage.OutlineSettings.RoundingType" Value="HalfHeightRadius" />
+    <Setter Property="WidgetStyle.DisabledThumbImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.DisabledThumbImage.OutlineSettings.CornerRadii" Value="0,0,0,0" />
+    <Setter Property="WidgetStyle.DisabledThumbImage.ImageSize" Value="8,8" />
+
+    <Setter Property="WidgetStyle.BarThickness" Value="4" />
+  </Style>
+
+  <!-- ==================== 进度条 ProgressBar ==================== -->
+
+  <!-- 隐式：引擎条目名 ProgressBar
+       背景 = FSlateColorBrush(Foldout)（纯色，无圆角无描边）；
+       填充/跑马灯 = IMAGE_BRUSH("Starship/CoreWidgets/ProgressBar/ProgressMarquee",
+       (20,12), PrimaryHover, Tiling Horizontal)：条纹贴图直接引用引擎 Content 下的
+       同一张 PNG（ImageType=FullColor）。 -->
+  <Style TargetType="ProgressBar">
+    <Setter Property="WidgetStyle.BackgroundImage.DrawAs" Value="Image" />
+    <Setter Property="WidgetStyle.BackgroundImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundImage.TintColor" Value="Foldout" />
+    <Setter Property="WidgetStyle.FillImage.DrawAs" Value="Image" />
+    <Setter Property="WidgetStyle.FillImage.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.FillImage.ResourceName" Value="../../../Engine/Content/Slate/Starship/CoreWidgets/ProgressBar/ProgressMarquee.png" />
+    <Setter Property="WidgetStyle.FillImage.ImageSize" Value="20,12" />
+    <Setter Property="WidgetStyle.FillImage.Tiling" Value="Horizontal" />
+    <Setter Property="WidgetStyle.FillImage.TintColor" Value="PrimaryHover" />
+    <Setter Property="WidgetStyle.FillImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.MarqueeImage.DrawAs" Value="Image" />
+    <Setter Property="WidgetStyle.MarqueeImage.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.MarqueeImage.ResourceName" Value="../../../Engine/Content/Slate/Starship/CoreWidgets/ProgressBar/ProgressMarquee.png" />
+    <Setter Property="WidgetStyle.MarqueeImage.ImageSize" Value="20,12" />
+    <Setter Property="WidgetStyle.MarqueeImage.TintColor" Value="PrimaryHover" />
+    <Setter Property="WidgetStyle.MarqueeImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.MarqueeImage.Tiling" Value="Horizontal" />
+    <Setter Property="WidgetStyle.EnableFillAnimation" Value="true" />
+  </Style>
+
+  <!-- ==================== 下拉框 ComboBox ==================== -->
+
+  <!-- 隐式：引擎条目名 ComboBox
+       ContentPadding=0、MenuRowPadding=(8,3)；按钮部分是
+       FSlateRoundedBoxBrush(Input, InputFocusRadius, InputOutline/Hover, 1)。
+       引擎还带一个 SVG 下箭头（DownArrowImage），需要贴图，这里没有。 -->
+  <Style TargetType="ComboBoxString">
+    <Setter Property="WidgetStyle.ContentPadding" Value="0,0,0,0" />
+    <Setter Property="WidgetStyle.MenuRowPadding" Value="8,3,8,3" />
+    <Setter Property="Font.Size" Value="10" />
+    <Setter Property="ForegroundColor" Value="Foreground" />
+
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.OutlineSettings.Color" Value="InputOutline" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.OutlineSettings.Width" Value="1" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.NormalPadding" Value="8,1,8,1" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.PressedPadding" Value="8,2,8,0" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.NormalForeground" Value="Foreground" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.HoveredForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.PressedForeground" Value="ForegroundHover" />
+
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.OutlineSettings.Color" Value="Hover" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.OutlineSettings.Color" Value="Hover" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.ComboButtonStyle.ContentPadding" Value="0,0,0,0" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderBrush.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderBrush.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderBrush.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderBrush.TintColor" Value="Dropdown" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderBrush.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderBrush.OutlineSettings.CornerRadii" Value="0,0,0,0" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderBrush.OutlineSettings.Color" Value="DropdownOutline" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderBrush.OutlineSettings.Width" Value="1" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderPadding" Value="0,0,0,0" />
+
+    <!-- 下箭头：引擎是矢量刷子
+         IMAGE_BRUSH_SVG("Starship/CoreWidgets/ComboBox/wide-chevron-down", 16x16)。
+         这里直接引用引擎 Content/Slate 下的同一个 SVG（ImageType=Vector）。 -->
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.DrawAs" Value="Image" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.ImageType" Value="Vector" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.TintColor" Value="Foreground" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.ResourceName" Value="../../../Engine/Content/Slate/Starship/CoreWidgets/ComboBox/wide-chevron-down.svg" />
+
+    <!-- 行样式：引擎里是独立条目 ComboBox.Row（FTableRowStyle），UMG 只能写在控件上 -->
+    <Setter Property="ItemStyle.EvenRowBackgroundBrush.DrawAs" Value="NoDrawType" />
+    <Setter Property="ItemStyle.EvenRowBackgroundHoveredBrush.TintColor" Value="Primary" />
+    <Setter Property="ItemStyle.EvenRowBackgroundHoveredBrush.OutlineSettings.Width" Value="0" />
+    <Setter Property="ItemStyle.OddRowBackgroundBrush.DrawAs" Value="NoDrawType" />
+    <Setter Property="ItemStyle.OddRowBackgroundHoveredBrush.TintColor" Value="Primary" />
+    <Setter Property="ItemStyle.OddRowBackgroundHoveredBrush.OutlineSettings.Width" Value="0" />
+    <Setter Property="ItemStyle.TextColor" Value="White" />
+    <Setter Property="ItemStyle.SelectedTextColor" Value="White" />
+  </Style>
+
+  <!-- ==================== 微调框 SpinBox ==================== -->
+
+  <!-- 隐式：引擎条目名 SpinBox
+       背景/悬停/激活 = FSlateRoundedBoxBrush(Input, 4, InputOutline/Hover/Primary, 1)，
+       三个 Fill 刷子 = FSlateRoundedBoxBrush(<色>, 4, Transparent, 1)，
+       TextPadding=(7,2.5,7,2.5)，InsetPadding=1 -->
+  <Style TargetType="SpinBox">
+    <Setter Property="WidgetStyle.BackgroundBrush.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.BackgroundBrush.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundBrush.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundBrush.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.BackgroundBrush.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.BackgroundBrush.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.BackgroundBrush.OutlineSettings.Color" Value="InputOutline" />
+    <Setter Property="WidgetStyle.BackgroundBrush.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.HoveredBackgroundBrush.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.HoveredBackgroundBrush.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.HoveredBackgroundBrush.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.HoveredBackgroundBrush.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.HoveredBackgroundBrush.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.HoveredBackgroundBrush.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.HoveredBackgroundBrush.OutlineSettings.Color" Value="Hover" />
+    <Setter Property="WidgetStyle.HoveredBackgroundBrush.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.ActiveBackgroundBrush.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.ActiveBackgroundBrush.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.ActiveBackgroundBrush.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.ActiveBackgroundBrush.TintColor" Value="Input" />
+    <Setter Property="WidgetStyle.ActiveBackgroundBrush.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.ActiveBackgroundBrush.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.ActiveBackgroundBrush.OutlineSettings.Color" Value="Primary" />
+    <Setter Property="WidgetStyle.ActiveBackgroundBrush.OutlineSettings.Width" Value="1" />
+
+    <Setter Property="WidgetStyle.ActiveFillBrush.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.ActiveFillBrush.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.ActiveFillBrush.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.ActiveFillBrush.TintColor" Value="Primary" />
+    <Setter Property="WidgetStyle.ActiveFillBrush.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.ActiveFillBrush.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.ActiveFillBrush.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+
+    <Setter Property="WidgetStyle.HoveredFillBrush.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.HoveredFillBrush.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.HoveredFillBrush.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.HoveredFillBrush.TintColor" Value="Hover" />
+    <Setter Property="WidgetStyle.HoveredFillBrush.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.HoveredFillBrush.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.HoveredFillBrush.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+
+    <Setter Property="WidgetStyle.InactiveFillBrush.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.InactiveFillBrush.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.InactiveFillBrush.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.InactiveFillBrush.TintColor" Value="Dropdown" />
+    <Setter Property="WidgetStyle.InactiveFillBrush.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.InactiveFillBrush.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.InactiveFillBrush.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+
+    <!-- 引擎 SpinBox 的 ArrowsImage 是空画刷（0x0）；UMG 默认样式带一张 12x12 的
+         箭头贴图，只改 DrawAs 的话 SImage 仍会占 12x12、把文字区挤窄，
+         所以 ImageSize 也要一起清零。 -->
+    <Setter Property="WidgetStyle.ArrowsImage.DrawAs" Value="NoDrawType" />
+    <Setter Property="WidgetStyle.ArrowsImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.ArrowsImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.ArrowsImage.ImageSize" Value="0,0" />
+    <Setter Property="WidgetStyle.ForegroundColor" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.TextPadding" Value="7,2.5,7,2.5" />
+    <Setter Property="WidgetStyle.InsetPadding" Value="1,1,1,1" />
+    <Setter Property="Font.Size" Value="10" />
+    <Setter Property="ForegroundColor" Value="Foreground" />
+  </Style>
+
+  <!-- ================================================================
+       WidgetMarkup 补充（引擎样式集里没有同名条目）
+       这三个只是语义色预设，方便业务侧直接引用。
+       ================================================================ -->
+
+  <Style TargetType="TextBlock" Name="Warning">
+    <Setter Property="ColorAndOpacity" Value="Warning" />
+  </Style>
+
+  <Style TargetType="TextBlock" Name="Error">
+    <Setter Property="ColorAndOpacity" Value="Error" />
+  </Style>
+
+  <Style TargetType="TextBlock" Name="Success">
+    <Setter Property="ColorAndOpacity" Value="Success" />
+  </Style>
+
+</StyleSheet>

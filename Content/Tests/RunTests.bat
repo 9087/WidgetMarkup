@@ -34,6 +34,7 @@ call :run_test "TestGridPanel" "GridPanel widget (ColumnFill/RowFill containers)
 call :run_test "TestOverlay" "Overlay widget" || exit /b 1
 call :run_test "TestStyleSheetInline" "StyleSheet (inline)" || exit /b 1
 call :run_test "TestStyleSheetOverride" "StyleSheet (inherit standalone file + override)" || exit /b 1
+call :run_test "TestStarshipStyle" "Framework style sheets (core + editor layer, inherit + override)" || exit /b 1
 call :run_test "TestListView" "ListView + ObservableCollection" || exit /b 1
 call :run_test "TestDynamicChild" "Dynamic add_child / remove_child / get_child" || exit /b 1
 call :run_test "TestDelegateLeak" "Delegate binding leak (add/remove delegate-bound child)" || exit /b 1

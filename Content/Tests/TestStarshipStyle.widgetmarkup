@@ -1,0 +1,77 @@
+<WidgetBlueprint Script="Tests.TestStarshipStyle">
+  <!-- Inherit the editor layer, which itself inherits StarshipCoreStyle. -->
+  <StyleSheet Inherit="/WidgetMarkup/Core/Styles/StarshipStyle">
+    <!-- Local override of an entry the editor layer also defines: the setters
+         must merge, so the local Font.Size wins while the editor's colour
+         survives. -->
+    <Style TargetType="TextBlock" Name="NormalText.Important">
+      <Setter Property="Font.Size" Value="18" />
+    </Style>
+
+    <!-- Base= probes. Margins are used because they are exact numbers, so the
+         assertions do not depend on the current theme colors. -->
+    <Style TargetType="Button" Name="BaseProbe">
+      <Setter Property="WidgetStyle.NormalPadding" Value="11,12,13,14" />
+      <Setter Property="WidgetStyle.PressedPadding" Value="21,22,23,24" />
+    </Style>
+    <!-- Inherits NormalPadding from BaseProbe, overrides PressedPadding. -->
+    <Style TargetType="Button" Name="DerivedProbe" Base="BaseProbe">
+      <Setter Property="WidgetStyle.PressedPadding" Value="31,32,33,34" />
+    </Style>
+    <!-- Two-level chain: NormalPadding is its own, PressedPadding comes through DerivedProbe. -->
+    <Style TargetType="Button" Name="ChainedProbe" Base="DerivedProbe">
+      <Setter Property="WidgetStyle.NormalPadding" Value="41,42,43,44" />
+    </Style>
+    <!-- Points at a style that does not exist: must warn and degrade, not crash. -->
+    <Style TargetType="Button" Name="MissingBaseProbe" Base="NoSuchStyle">
+      <Setter Property="WidgetStyle.NormalPadding" Value="51,52,53,54" />
+    </Style>
+  </StyleSheet>
+  <WidgetTree>
+    <VerticalBox>
+      <TextBlock Name="ImportantText" Style="NormalText.Important" Text="important" />
+      <TextBlock Name="SubduedText" Style="NormalText.Subdued" Text="subdued" />
+      <TextBlock Name="SmallTextBlock" Style="SmallText" Text="small" />
+      <TextBlock Name="LargeTextBlock" Style="LargeText" Text="large" />
+      <TextBlock Name="TinyTextBlock" Style="TinyText" Text="tiny" />
+      <TextBlock Name="WarningText" Style="TextBlock.ShadowedTextWarning" Text="warning" />
+      <TextBlock Name="ErrorText" Style="Error" Text="error" />
+      <TextBlock Name="PlainText" Text="plain" />
+      <Button Name="PrimaryButton" Style="PrimaryButton">
+        <TextBlock Text="OK" />
+      </Button>
+      <Button Name="FlatButton" Style="FlatButton">
+        <TextBlock Text="flat" />
+      </Button>
+      <Button Name="FlatDangerButton" Style="FlatButton.Danger">
+        <TextBlock Text="danger" />
+      </Button>
+      <Button Name="SimpleSharpButton" Style="SimpleSharpButton">
+        <TextBlock Text="sharp" />
+      </Button>
+      <Button Name="ToggleButton" Style="ToggleButton">
+        <TextBlock Text="toggle" />
+      </Button>
+      <Button Name="BaseProbeButton" Style="BaseProbe">
+        <TextBlock Text="b" />
+      </Button>
+      <Button Name="DerivedProbeButton" Style="DerivedProbe">
+        <TextBlock Text="d" />
+      </Button>
+      <Button Name="ChainedProbeButton" Style="ChainedProbe">
+        <TextBlock Text="c" />
+      </Button>
+      <Button Name="MissingBaseProbeButton" Style="MissingBaseProbe">
+        <TextBlock Text="m" />
+      </Button>
+      <CheckBox Name="CheckBoxA" />
+      <CheckBox Name="ToggleLookCheckBox" Style="CheckboxLookToggleButtonCheckbox" />
+      <EditableTextBox Name="InputBox" />
+      <Slider Name="SliderA" />
+      <ProgressBar Name="ProgressA" />
+      <ComboBoxString Name="ComboA" />
+      <ComboBoxString Name="ToolbarCombo" Style="ToolbarComboButton" />
+      <SpinBox Name="SpinA" />
+    </VerticalBox>
+  </WidgetTree>
+</WidgetBlueprint>
