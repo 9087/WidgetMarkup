@@ -198,6 +198,13 @@ public:
 	const FString& GetExtraArguments() const { return ExtraArguments; }
 	void SetExtraArguments(const FString& InExtraArguments) { ExtraArguments = InExtraArguments; }
 
+	/**
+	 * True when ExtraArguments contains a "test" token, e.g.
+	 * "test -nullrhi -WidgetMarkupTestTimeout=120". Match on the token rather
+	 * than the whole string so extra engine switches can be appended freely.
+	 */
+	bool IsTestMode() const;
+
 	/** Process exit code reported by the script integration (e.g. test runs). */
 	int32 GetExitCode() const { return ExitCode; }
 	void SetExitCode(int32 InExitCode) { ExitCode = InExitCode; }

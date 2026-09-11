@@ -978,6 +978,15 @@ void FWidgetMarkupModule::Shutdown()
 	ScriptIntegration = nullptr;
 }
 
+bool FWidgetMarkupModule::IsTestMode() const
+{
+	// The runner passes the whole switch bundle, e.g.
+	// "test -nullrhi -WidgetMarkupTestTimeout=120", so match the token.
+	TArray<FString> Tokens;
+	ExtraArguments.ParseIntoArrayWS(Tokens);
+	return Tokens.Contains(TEXT("test"));
+}
+
 void FWidgetMarkupModule::NotifyInitialized()
 {
 	if (bInitialized)

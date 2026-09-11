@@ -37,5 +37,5 @@ class TestListView(TestComponent):
 
             self.report()
         finally:
-            if widget_markup.Application.get_extra_arguments() == "test":
+            if widget_markup.Application.is_test_mode():
                 widget_markup.Application.request_shutdown()

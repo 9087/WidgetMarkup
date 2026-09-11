@@ -99,5 +99,5 @@ class TestAttributes(TestComponent):
         self.check_equal(len(leaf.get_editor_property("Attributes")), 0, "leaf attribute: empty list")
 
         self.report()
-        if widget_markup.Application.get_extra_arguments() == "test":
+        if widget_markup.Application.is_test_mode():
             widget_markup.Application.request_shutdown()

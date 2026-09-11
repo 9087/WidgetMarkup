@@ -15,6 +15,11 @@ class Application:
         return _Application.get_extra_arguments()
 
     @staticmethod
+    def is_test_mode() -> bool:
+        """True when the app was launched with the 'test' extra argument token."""
+        return _Application.is_test_mode()
+
+    @staticmethod
     def request_shutdown():
         """Request engine exit (for standalone programs)."""
         return _Application.request_shutdown()

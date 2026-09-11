@@ -12,7 +12,7 @@ class TestEmpty(TestComponent):
             self.report()
         finally:
             # Only request shutdown if this is the root widget (not embedded).
-            if widget_markup.Application.get_extra_arguments() == "test":
+            if widget_markup.Application.is_test_mode():
                 uw = getattr(self, "_widget_markup_user_widget", None)
                 if uw is not None and uw.get_parent() is None:
                     widget_markup.Application.request_shutdown()
