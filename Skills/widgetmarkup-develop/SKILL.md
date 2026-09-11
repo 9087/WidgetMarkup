@@ -425,7 +425,29 @@ The `Property` supports dot-separated sub-property paths (e.g., `Font.Size`, `Pa
 - Container children map to container entries (Array/Set elements; Map uses `<Pair>`); a single child on a scalar/struct property is the whole value.
 - Paths that cannot be resolved at compile time (object-pointer segments like `Slot.*`, array indices, unknown targets) emit a **warning** and the child element is ignored — use the `Value` attribute for those.
 
-### 5.5 System Fonts via Font.FontObject
+### 5.5 Style Composition with `Base`
+
+A named style can start from another named style of the same `TargetType` instead of repeating every setter — the equivalent of the engine's `FButtonStyle(BaseStyle).SetXxx(...)` composition:
+
+```xml
+<Style TargetType="Button" Name="Flat">
+  <Setter Property="WidgetStyle.Normal.DrawAs" Value="NoDrawType" />
+  <Setter Property="WidgetStyle.Hovered.TintColor" Value="Hover" />
+</Style>
+
+<!-- Inherits both setters above and overrides only the text color. -->
+<Style TargetType="Button" Name="Flat.Danger" Base="Flat">
+  <Setter Property="WidgetStyle.NormalForeground" Value="Error" />
+</Style>
+```
+
+- Inside one entry the **base-most ancestor is applied first and the entry's own setters last**, so the derived style always wins on a shared property path.
+- Chains are followed to any depth: `C` with `Base="B"` and `B` with `Base="A"` ends up with `A` + `B` + `C`.
+- The base may live in an inherited sheet (chains are expanded *after* the `Inherit` merge), and a local entry may override both the setters and the `Base` of an inherited entry.
+- Implicit entries (no `Name`) already apply to every widget of that type regardless of `Style`, so `Base` is normally only needed between **named** styles.
+- A missing or cyclic `Base` logs a `LogWidgetMarkup` warning and is ignored — the entry keeps its own setters and compilation continues.
+
+### 5.6 System Fonts via Font.FontObject
 
 `Font.FontObject` accepts a font family name (e.g., `'seguisym'`) to load a system font without requiring a UFont asset:
 
@@ -443,12 +465,13 @@ The `Property` supports dot-separated sub-property paths (e.g., `Font.Size`, `Pa
 
 > **How it works:** `FObjectConverter` first tries `StaticLoadObject` on the value as an asset path. If that fails and the property is `FontObject` on `FSlateFontInfo`, `UWidgetMarkupFontProvider::CreateFromFontName` resolves the font file from OS font directories (Windows: `%SystemRoot%/Fonts/`, `%LocalAppData%/Microsoft/Windows/Fonts/`; Mac: `/System/Library/Fonts/`, `/Library/Fonts/`; Linux: `/usr/share/fonts/truetype/`).
 
-### 5.6 Resolution Order
+### 5.7 Resolution Order
 
 1. Base stylesheet loaded (if `Inherit` specified)
-2. Current sheet's styles merged on top (same `(TargetType, Name)` replaces)
-3. `UWidgetStyleSheet::ResolveComputedStyles` produces flat `ComputedStyles` array
-4. At widget construction, implicit styles apply first, then explicit `Style="Name"` overrides
+2. Current sheet's styles merged on top at the setter level (same `(TargetType, Name)` merges setters — local wins per `Property`, and a local `Base` replaces the inherited one)
+3. `Base` chains expanded into flat setter lists
+4. `UWidgetStyleSheet::ResolveComputedStyles` produces flat `ComputedStyles` array
+5. At widget construction, implicit styles apply first, then explicit `Style="Name"` overrides
 
 > **Warning:** Styles are applied at widget construction time. Changing `Style` at runtime has no effect.
 

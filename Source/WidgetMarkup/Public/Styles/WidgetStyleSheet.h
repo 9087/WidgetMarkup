@@ -44,6 +44,17 @@ struct FWidgetStyleEntry
 	UPROPERTY(EditAnywhere, Category = "Style")
 	FName Name = NAME_None;
 
+	/**
+	 * Optional name of another style with the same TargetType to start from.
+	 * This entry's setters are applied on top of that style's setters, so a
+	 * variant only has to spell out what it changes (the equivalent of the
+	 * engine's FButtonStyle(BaseStyle).SetXxx(...) composition). Chains are
+	 * resolved in ResolveComputedStyles(); a missing or cyclic Base is reported
+	 * as a warning and otherwise ignored.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Style")
+	FName Base = NAME_None;
+
 	UPROPERTY(EditAnywhere, Category = "Style")
 	TArray<FWidgetStyleSetter> Setters;
 };
@@ -76,4 +87,13 @@ public:
 	//~Begin UObject interface
 	static void AddReferencedObjects(UObject* InThis, FReferenceCollector& Collector);
 	//~End UObject interface
+
+private:
+	/**
+	 * Expand every Base chain in ComputedStyles into flat setter lists
+	 * (base-most ancestor first, the entry's own setters last so they win).
+	 * Runs after the Inherit merge, which means a Base may also name an entry
+	 * that came from the inherited sheet.
+	 */
+	void ExpandBaseStyles();
 };

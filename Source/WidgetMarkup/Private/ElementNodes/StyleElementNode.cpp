@@ -23,6 +23,7 @@ FWidgetStyleEntry FStyleElementNode::MakeStyle() const
 	{
 		Entry.TargetType = Memory->TargetType;
 		Entry.Name = Memory->Name;
+		Entry.Base = Memory->Base;
 	}
 	for (const TSharedPtr<FSetterElementNode>& Node : SetterNodes)
 	{
