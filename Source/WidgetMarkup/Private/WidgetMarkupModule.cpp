@@ -146,6 +146,7 @@ void FWidgetMarkupModule::StartupModule()
 	FConverterRegistry::Get().Register(NAME_Vector, FConverterRegistry::FOnCreateConverter::CreateStatic(TVectorConverter<FVector::FReal, 3>::Create));
 	FConverterRegistry::Get().Register(NAME_Vector2D, FConverterRegistry::FOnCreateConverter::CreateStatic(TVectorConverter<FVector2D::FReal, 2>::Create));
 	FConverterRegistry::Get().Register(StaticStruct<FDeprecateSlateVector2D>()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(TVectorConverter<decltype(FDeprecateSlateVector2D::X), 2>::Create));
+	FConverterRegistry::Get().Register(TBaseStructure<FVector4>::Get()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(TVectorConverter<decltype(FVector4::X), 4>::Create));
 	FConverterRegistry::Get().Register(FWidgetPropertyPath::StaticStruct()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(FWidgetPropertyPathConverter::Create));
 	FConverterRegistry::Get().Register(NAME_ObjectProperty, FConverterRegistry::FOnCreateConverter::CreateStatic(FObjectConverter::Create));
 	FConverterRegistry::Get().Register(FSoftObjectProperty::StaticClass()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(FSoftObjectConverter::Create));
