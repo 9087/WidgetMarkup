@@ -1,8 +1,8 @@
-<WidgetBlueprint Script="Samples.StarshipStyleSample">
+<WidgetBlueprint Script="Samples.WidgetGallery">
   <!-- Inherit the editor layer, which inherits the core layer in turn. -->
   <StyleSheet Inherit="/WidgetMarkup/Core/Styles/StarshipStyle" />
   <WidgetTree>
-    <SlateBot InstanceName="StarshipStyleSample">
+    <SlateBot InstanceName="WidgetGallery">
       <SizeBox WidthOverride="560" HeightOverride="720">
       <Border BrushColor="0.11,0.11,0.13,1" Padding="16,16,16,16">
         <VerticalBox>
