@@ -48,7 +48,7 @@
 #include "PropertySetters/ResyncPropertySetter.h"
 #include "PropertyRuns/BlueprintImplementsPropertyRun.h"
 #include "PropertyRuns/BlueprintSuperPropertyRun.h"
-#include "PropertyRuns/ListViewListItemsPropertyRun.h"
+#include "PropertyRuns/DeferredPropertyRun.h"
 #include "PropertyRuns/ObjectNamePropertyRun.h"
 #include "PropertyRuns/StyleSheetInheritPropertyRun.h"
 #include "PropertyRuns/WidgetStylePropertyRun.h"
@@ -201,7 +201,9 @@ void FWidgetMarkupModule::StartupModule()
 	RegisterCustomPropertyRun(UBlueprint::StaticClass(), TEXT("Super"), FOnCreatePropertyRun::CreateStatic(&FBlueprintSuperPropertyRun::Create));
 	RegisterCustomPropertyRun(UBlueprint::StaticClass(), TEXT("Implements"), FOnCreatePropertyRun::CreateStatic(&FBlueprintImplementsPropertyRun::Create));
 	RegisterCustomPropertyRun(UWidgetBlueprint::StaticClass(), TEXT("Script"), FOnCreatePropertyRun::CreateStatic(&FWidgetBlueprintScriptPropertyRun::Create));
-	RegisterCustomPropertyRun(UListView::StaticClass(), TEXT("ListItems"), FOnCreatePropertyRun::CreateStatic(&FListViewListItemsPropertyRun::Create));
+	// ListItems is transient runtime state, so a value written into the template never
+	// reaches an instance; the deferred run captures it and applies it per instance.
+	RegisterCustomPropertyRun(UListView::StaticClass(), TEXT("ListItems"), FOnCreatePropertyRun::CreateStatic(&FDeferredPropertyRun::Create));
 	RegisterCustomPropertyRun(UWidget::StaticClass(), TEXT("Style"), FOnCreatePropertyRun::CreateStatic(&FWidgetStylePropertyRun::Create));
 	RegisterCustomPropertyRun(UWidgetStyleSheet::StaticClass(), TEXT("Inherit"), FOnCreatePropertyRun::CreateStatic(&FStyleSheetInheritPropertyRun::Create));
 	RegisterCustomPropertyRun(FWidgetMarkupBlueprintVariable::StaticStruct(), TEXT("Default"), FOnCreatePropertyRun::CreateStatic(&FVariableDefaultPropertyRun::Create));
