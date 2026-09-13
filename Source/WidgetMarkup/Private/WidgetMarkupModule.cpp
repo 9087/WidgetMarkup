@@ -18,6 +18,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Engine/Blueprint.h"
 #include "Components/ContentWidget.h"
+#include "Components/ComboBoxString.h"
 #include "Components/Image.h"
 #include "Components/ListView.h"
 #include "Components/TextBlock.h"
@@ -87,6 +88,51 @@ void IWidgetMarkupScriptIntegration::Initialize(bool bOK)
 FWidgetMarkupModule& FWidgetMarkupModule::Get()
 {
 	return FModuleManager::GetModuleChecked<FWidgetMarkupModule>("WidgetMarkup");
+}
+
+namespace
+{
+	/**
+	 * Applies UComboBoxString::SelectedOption the way the widget itself would.
+	 *
+	 * UComboBoxString::SetSelectedIndex() updates the content area only when the
+	 * property differs from the option it is about to select, and the generic
+	 * property write already stored the new value - so the selection would be
+	 * remembered but never drawn (GetSelectedOption() would even report success,
+	 * because it reads the internal pointer). Rewinding the property forces a real
+	 * change; the widget then writes it back itself.
+	 *
+	 * @param Selection by value on purpose: the caller may hand over a value that
+	 *        aliases the property memory this function rewrites.
+	 */
+	void SelectComboBoxOption(UComboBoxString& ComboBox, FString Selection)
+	{
+		// SelectedOption is private, so reflection is the only way in.
+		FStrProperty* SelectionProperty = FindFProperty<FStrProperty>(UComboBoxString::StaticClass(), TEXT("SelectedOption"));
+		if (!SelectionProperty)
+		{
+			return;
+		}
+
+		void* SelectionAddress = SelectionProperty->ContainerPtrToValuePtr<void>(&ComboBox);
+		if (Selection.IsEmpty())
+		{
+			ComboBox.ClearSelection();
+			SelectionProperty->SetPropertyValue(SelectionAddress, FString());
+			return;
+		}
+
+		SelectionProperty->SetPropertyValue(SelectionAddress, FString());
+		ComboBox.SetSelectedOption(Selection);
+
+		if (SelectionProperty->GetPropertyValue(SelectionAddress) != Selection)
+		{
+			// The option is not in the list: nothing can be drawn, so drop the shown
+			// item but keep the requested value for a later DefaultOptions write.
+			ComboBox.ClearSelection();
+			SelectionProperty->SetPropertyValue(SelectionAddress, Selection);
+		}
+	}
 }
 
 void FWidgetMarkupModule::StartupModule()
@@ -160,12 +206,46 @@ void FWidgetMarkupModule::StartupModule()
 	RegisterCustomPropertyRun(UWidgetStyleSheet::StaticClass(), TEXT("Inherit"), FOnCreatePropertyRun::CreateStatic(&FStyleSheetInheritPropertyRun::Create));
 	RegisterCustomPropertyRun(FWidgetMarkupBlueprintVariable::StaticStruct(), TEXT("Default"), FOnCreatePropertyRun::CreateStatic(&FVariableDefaultPropertyRun::Create));
 	// Properties whose plain copy is not the correct runtime operation: the engine
-	// reads them only at construction, or only through a dedicated API.
+	// reads them only at construction (DefaultOptions) or only through a dedicated
+	// API (ListItems, SelectedOption).
 	RegisterPropertyResync<UListView, TArray<UObject*>>(TEXT("ListItems"),
 		[](UListView& ListView, const TArray<UObject*>& Items)
 		{
 			// Transient runtime state: the engine API also notifies OnItemsChanged.
 			ListView.SetListItems(Items);
+		});
+
+	RegisterPropertyResync<UComboBoxString, TArray<FString>>(TEXT("DefaultOptions"),
+		[](UComboBoxString& ComboBox, const TArray<FString>& Options)
+		{
+			// UComboBoxString expands DefaultOptions into its runtime option list only
+			// in PostInitProperties()/PostLoad() and never re-reads it, so rebuild the
+			// list here. ClearOptions() also drops the drawn selection, so read the
+			// pending one (private property: reflection) and restore it afterwards.
+			FStrProperty* SelectionProperty = FindFProperty<FStrProperty>(UComboBoxString::StaticClass(), TEXT("SelectedOption"));
+			void* SelectionAddress = SelectionProperty ? SelectionProperty->ContainerPtrToValuePtr<void>(&ComboBox) : nullptr;
+			const FString PreviousSelection = SelectionAddress ? SelectionProperty->GetPropertyValue(SelectionAddress) : FString();
+
+			ComboBox.ClearOptions();
+			for (const FString& Option : Options)
+			{
+				ComboBox.AddOption(Option);
+			}
+
+			// Restoring the selection is also what makes RebuildWidget() draw the item
+			// when the Slate widget does not exist yet.
+			if (SelectionAddress)
+			{
+				SelectComboBoxOption(ComboBox, PreviousSelection);
+			}
+		});
+
+	RegisterPropertyResync<UComboBoxString, FString>(TEXT("SelectedOption"),
+		[](UComboBoxString& ComboBox, const FString& Selection)
+		{
+			// A plain copy changes the string but leaves SComboBox drawing the item it
+			// was last given.
+			SelectComboBoxOption(ComboBox, Selection);
 		});
 	
 	FCoreDelegates::OnPostEngineInit.AddRaw(this, &FWidgetMarkupModule::OnPostEngineInit);
@@ -224,6 +304,8 @@ void FWidgetMarkupModule::ShutdownModule()
 	UnregisterCustomPropertyRun(UWidgetStyleSheet::StaticClass(), TEXT("Inherit"));
 	UnregisterCustomPropertyRun(FWidgetMarkupBlueprintVariable::StaticStruct(), TEXT("Default"));
 	UnregisterCustomPropertySetter(UListView::StaticClass(), TEXT("ListItems"));
+	UnregisterCustomPropertySetter(UComboBoxString::StaticClass(), TEXT("DefaultOptions"));
+	UnregisterCustomPropertySetter(UComboBoxString::StaticClass(), TEXT("SelectedOption"));
 
 	FCoreDelegates::OnPostEngineInit.RemoveAll(this);
 	StopSourceFileWatching();

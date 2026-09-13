@@ -1,0 +1,19 @@
+<WidgetBlueprint Script="Tests.TestArrayBinding">
+  <WidgetTree>
+    <CanvasPanel>
+      <!-- Property-element form: the array is written while the blueprint is
+           compiled, i.e. into the widget tree template. -->
+      <ComboBoxString Name="ComboLiteral" SelectedOption="ComboBox">
+        <DefaultOptions>
+          <String>ComboBox</String>
+          <String>Second entry</String>
+        </DefaultOptions>
+      </ComboBoxString>
+      <!-- Binding form: the Python list is written after the runtime widget
+           tree already exists (the Python component is created afterwards). -->
+      <ComboBoxString Name="ComboBound" SelectedOption="ComboBox" DefaultOptions="{options}" />
+      <!-- Scalar binding, as a control that bindings are applied at all. -->
+      <TextBlock Name="Label" Text="{label}" />
+    </CanvasPanel>
+  </WidgetTree>
+</WidgetBlueprint>

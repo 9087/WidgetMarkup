@@ -57,15 +57,18 @@
           <SizeBox HeightOverride="26" Slot.Padding="0,0,0,8">
             <EditableTextBox HintText="type here" />
           </SizeBox>
-          <!-- 已知差异：引擎的 SComboBox 内容区是独立的 TextBlock，所以参考示例里
-               下拉框能显示文字；UMG 的 UComboBoxString 只有在 DefaultOptions 里
-               能找到该选项时才画文字（UComboBoxString.cpp:InitialIndex），而
-               WidgetMarkup 目前不支持数组属性，所以这里只有框和箭头、没有文字。 -->
+          <!-- 两种数组写法：第 1 行在 XML 里用属性元素写死选项，第 2 行的选项列表和
+               选中项都来自 Python 绑定（"Second entry" 只存在于 combo_options 里）。 -->
           <SizeBox HeightOverride="26" Slot.Padding="0,0,0,8">
-            <ComboBoxString SelectedOption="ComboBox" />
+            <ComboBoxString Name="ComboLiteral" SelectedOption="ComboBox">
+              <DefaultOptions>
+                <String>ComboBox</String>
+                <String>Second entry</String>
+              </DefaultOptions>
+            </ComboBoxString>
           </SizeBox>
           <SizeBox HeightOverride="26" Slot.Padding="0,0,0,8">
-            <ComboBoxString Style="ToolbarComboButton" SelectedOption="ToolbarComboButton" />
+            <ComboBoxString Name="ComboBound" Style="ToolbarComboButton" SelectedOption="{combo_selection}" DefaultOptions="{combo_options}" />
           </SizeBox>
           <SizeBox HeightOverride="26" Slot.Padding="0,0,0,14">
             <SpinBox Value="42" />
