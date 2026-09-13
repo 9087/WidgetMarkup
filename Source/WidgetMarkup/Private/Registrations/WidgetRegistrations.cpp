@@ -3,10 +3,14 @@
 #include "Registrations/WidgetRegistrations.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/ComboBox.h"
+#include "Components/ComboBoxKey.h"
 #include "Components/ComboBoxString.h"
 #include "Components/ContentWidget.h"
 #include "Components/ListView.h"
 #include "Components/PanelWidget.h"
+#include "Components/RichTextBlock.h"
+#include "Components/RichTextBlockDecorator.h"
 #include "Components/Widget.h"
 #include "ConverterRegistry.h"
 #include "Converters/SlateChildSizeConverter.h"
@@ -25,6 +29,7 @@
 #include "UObject/UnrealType.h"
 #include "WidgetBlueprint.h"
 #include "WidgetMarkupModule.h"
+#include "Widgets/Input/SComboBox.h"
 
 void RegisterWidgetRegistrations(FWidgetMarkupModule& Module)
 {
@@ -131,6 +136,105 @@ void RegisterWidgetRegistrations(FWidgetMarkupModule& Module)
 			// was last given.
 			SelectComboBoxOption(ComboBox, Selection);
 		});
+
+	// UComboBoxKey has no refresh API either, so the option list is rebuilt the same way.
+	// Its SelectedOption is different: SetSelectedOption() calls the Slate widget when one
+	// exists and does not write the property back itself, so the requested value is
+	// restored after the call (and there is nothing to clear when the option is unknown -
+	// the property should simply keep what was asked for).
+	const auto SelectComboBoxKeyOption = [](UComboBoxKey& ComboBox, FName Option)
+	{
+		FNameProperty* SelectionProperty = FindFProperty<FNameProperty>(UComboBoxKey::StaticClass(), TEXT("SelectedOption"));
+		if (!SelectionProperty)
+		{
+			return;
+		}
+
+		void* SelectionAddress = SelectionProperty->ContainerPtrToValuePtr<void>(&ComboBox);
+		if (Option.IsNone())
+		{
+			ComboBox.ClearSelection();
+			SelectionProperty->SetPropertyValue(SelectionAddress, NAME_None);
+			return;
+		}
+
+		SelectionProperty->SetPropertyValue(SelectionAddress, NAME_None);
+		ComboBox.SetSelectedOption(Option);
+
+		if (SelectionProperty->GetPropertyValue(SelectionAddress) != Option)
+		{
+			SelectionProperty->SetPropertyValue(SelectionAddress, Option);
+		}
+	};
+
+	Module.RegisterPropertyResync<UComboBoxKey, TArray<FName>>(TEXT("Options"),
+		[SelectComboBoxKeyOption](UComboBoxKey& ComboBox, const TArray<FName>& Options)
+		{
+			// Options is the array SComboBox draws from, but only AddOption()/ClearOptions()
+			// refresh the widget. ClearOptions() also drops the selection, so restore it.
+			FNameProperty* SelectionProperty = FindFProperty<FNameProperty>(UComboBoxKey::StaticClass(), TEXT("SelectedOption"));
+			void* SelectionAddress = SelectionProperty ? SelectionProperty->ContainerPtrToValuePtr<void>(&ComboBox) : nullptr;
+			const FName PreviousSelection = SelectionAddress ? SelectionProperty->GetPropertyValue(SelectionAddress) : NAME_None;
+
+			ComboBox.ClearOptions();
+			for (const FName& Option : Options)
+			{
+				ComboBox.AddOption(Option);
+			}
+
+			if (SelectionAddress)
+			{
+				SelectComboBoxKeyOption(ComboBox, PreviousSelection);
+			}
+		});
+
+	Module.RegisterPropertyResync<UComboBoxKey, FName>(TEXT("SelectedOption"),
+		[SelectComboBoxKeyOption](UComboBoxKey& ComboBox, const FName& Selection)
+		{
+			SelectComboBoxKeyOption(ComboBox, Selection);
+		});
+
+	// UComboBox exposes no refresh API at all: RebuildWidget() only hands SComboBox a
+	// pointer to Items, while the Slate widget keeps its own copy of the options, so the
+	// cached widget has to be told to re-read the array.
+	Module.RegisterPropertyResync<UComboBox, TArray<UObject*>>(TEXT("Items"),
+		[](UComboBox& ComboBox, const TArray<UObject*>& /*Items*/)
+		{
+			if (TSharedPtr<SWidget> CachedWidget = ComboBox.GetCachedWidget())
+			{
+				if (TSharedPtr<SComboBox<UObject*>> SlateComboBox = StaticCastSharedPtr<SComboBox<UObject*>>(CachedWidget))
+				{
+					SlateComboBox->RefreshOptions();
+				}
+			}
+		});
+
+	// DecoratorClasses is only the input: URichTextBlock builds its decorators (and a
+	// style set) from it, so SetDecorators() is the call that makes a write take effect.
+	Module.RegisterPropertyResync<URichTextBlock, TArray<UObject*>>(TEXT("DecoratorClasses"),
+		[](URichTextBlock& TextBlock, const TArray<UObject*>& DecoratorClasses)
+		{
+			TArray<TSubclassOf<URichTextBlockDecorator>> DecoratorClassList;
+			DecoratorClassList.Reserve(DecoratorClasses.Num());
+			for (UObject* Entry : DecoratorClasses)
+			{
+				if (UClass* EntryClass = Cast<UClass>(Entry))
+				{
+					if (EntryClass->IsChildOf(URichTextBlockDecorator::StaticClass()))
+					{
+						DecoratorClassList.Add(EntryClass);
+					}
+				}
+			}
+
+			if (DecoratorClassList.Num() != DecoratorClasses.Num())
+			{
+				UE_LOG(LogWidgetMarkup, Warning, TEXT("RichTextBlock: dropped %d DecoratorClasses entr(ies) that are not URichTextBlockDecorator classes."),
+					DecoratorClasses.Num() - DecoratorClassList.Num());
+			}
+
+			TextBlock.SetDecorators(DecoratorClassList);
+		});
 }
 
 void UnregisterWidgetRegistrations(FWidgetMarkupModule& Module)
@@ -153,4 +257,8 @@ void UnregisterWidgetRegistrations(FWidgetMarkupModule& Module)
 	Module.UnregisterCustomPropertySetter(UListView::StaticClass(), TEXT("ListItems"));
 	Module.UnregisterCustomPropertySetter(UComboBoxString::StaticClass(), TEXT("DefaultOptions"));
 	Module.UnregisterCustomPropertySetter(UComboBoxString::StaticClass(), TEXT("SelectedOption"));
+	Module.UnregisterCustomPropertySetter(UComboBoxKey::StaticClass(), TEXT("Options"));
+	Module.UnregisterCustomPropertySetter(UComboBoxKey::StaticClass(), TEXT("SelectedOption"));
+	Module.UnregisterCustomPropertySetter(UComboBox::StaticClass(), TEXT("Items"));
+	Module.UnregisterCustomPropertySetter(URichTextBlock::StaticClass(), TEXT("DecoratorClasses"));
 }

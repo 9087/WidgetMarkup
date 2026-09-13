@@ -19,6 +19,14 @@ class TestArrayBinding(TestComponent):
     def label(self):
         return "bound"
 
+    @reactive
+    def key_options(self):
+        return ["FirstKey", "SecondKey"]
+
+    @reactive
+    def key_selection(self):
+        return "SecondKey"
+
     def __init__(self):
         try:
             super().__init__("TestArrayBinding")
@@ -61,6 +69,25 @@ class TestArrayBinding(TestComponent):
                 literal.get_editor_property("SelectedOption"), "ComboBox", "property-element selection property"
             )
             self.check_equal(bound.get_selected_option(), "ComboBox", "bound selection is restored")
+
+            # ComboBoxKey keeps both properties private, so the option list itself cannot
+            # be read here; the selection proves the write reached the widget. GetSelectedOption()
+            # returns the property (unlike UComboBoxString, which returns the Slate item).
+            key_combo = self.find_widget("KeyCombo")
+            self.check_not_none(key_combo, "key combo found")
+            self.check_equal(str(key_combo.get_selected_option()), "SecondKey", "key combo selection")
+
+            # UComboBox: Items is readable, so the write can be asserted; the cached Slate
+            # widget is refreshed by the setter (not observable before TakeWidget).
+            object_combo = self.find_widget("ObjectCombo")
+            self.check_not_none(object_combo, "object combo found")
+            object_items = list(object_combo.get_editor_property("Items"))
+            self.check_equal(len(object_items), 2, "object combo item count")
+            self.check_equal(
+                [item.get_class().get_name() for item in object_items],
+                ["DataTable", "DataTable"],
+                "object combo item classes",
+            )
             self.report()
         finally:
             if widget_markup.Application.is_test_mode():
