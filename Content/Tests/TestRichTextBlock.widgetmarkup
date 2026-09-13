@@ -1,0 +1,10 @@
+<WidgetBlueprint Script="Tests.TestRichTextBlock">
+  <WidgetTree>
+    <CanvasPanel>
+      <!-- NOTE: DecoratorClasses cannot be written yet - a binding wraps Python objects in
+           UPythonWidgetMarkupListItem and no element node produces a UClass value - so the
+           setter registered for it (which calls SetDecorators()) has no reachable input here. -->
+      <RichTextBlock Name="RichText" Text="{rich_text}" />
+    </CanvasPanel>
+  </WidgetTree>
+</WidgetBlueprint>

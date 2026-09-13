@@ -1,0 +1,17 @@
+<WidgetBlueprint Script="Tests.TestComboBoxString">
+  <WidgetTree>
+    <CanvasPanel>
+      <!-- Property-element form: the array is written while the blueprint is compiled,
+           i.e. into the widget tree template. -->
+      <ComboBoxString Name="LiteralCombo" SelectedOption="ComboBox">
+        <DefaultOptions>
+          <String>ComboBox</String>
+          <String>Second entry</String>
+        </DefaultOptions>
+      </ComboBoxString>
+      <!-- Binding form: the Python values are written after the runtime widget tree
+           exists (the Python component is created afterwards). -->
+      <ComboBoxString Name="BoundCombo" SelectedOption="{selection}" DefaultOptions="{combo_options}" />
+    </CanvasPanel>
+  </WidgetTree>
+</WidgetBlueprint>

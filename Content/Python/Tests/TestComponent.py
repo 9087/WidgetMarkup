@@ -16,6 +16,51 @@ class TestComponent(WidgetMarkupComponent):
         self._test_name = test_name
         self._pass_count = 0
         self._fail_count = 0
+        self._deferred_phases = []
+        self._deferred_handle = None
+
+    def defer_checks(self, callback, ticks: int = 3) -> None:
+        """Queue a check phase that runs `ticks` frames later.
+
+        Everything in __init__ runs before the Slate widget is built (the Python
+        component is created before TakeWidget), so checks that depend on the built
+        widget - or on a reactive update applied to a built widget - belong in a
+        deferred phase. Phases run in the order they were queued; once the queue is
+        empty the test reports and shuts down.
+        """
+        self._deferred_phases.append((callback, ticks))
+        if self._deferred_handle is None:
+            self._deferred_handle = unreal.register_slate_post_tick_callback(self._on_deferred_tick)
+
+    def shutdown_if_test_mode(self) -> None:
+        """Shut down after __init__, unless queued phases report on their own."""
+        if self._deferred_phases or self._deferred_handle is not None:
+            return
+        if widget_markup.Application.is_test_mode():
+            widget_markup.Application.request_shutdown()
+
+    def _on_deferred_tick(self, delta_seconds) -> None:
+        if not self._deferred_phases:
+            self._finish_deferred()
+            return
+
+        callback, ticks_left = self._deferred_phases[0]
+        if ticks_left > 0:
+            self._deferred_phases[0] = (callback, ticks_left - 1)
+            return
+
+        self._deferred_phases.pop(0)
+        callback()
+        if not self._deferred_phases:
+            self._finish_deferred()
+
+    def _finish_deferred(self) -> None:
+        if self._deferred_handle is not None:
+            unreal.unregister_slate_post_tick_callback(self._deferred_handle)
+            self._deferred_handle = None
+        self.report()
+        if widget_markup.Application.is_test_mode():
+            widget_markup.Application.request_shutdown()
 
     def _record_failure(self) -> None:
         """Count a failed check and mark the process exit code as failed."""

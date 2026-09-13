@@ -1,0 +1,15 @@
+<WidgetBlueprint Script="Tests.TestComboBox">
+  <WidgetTree>
+    <CanvasPanel>
+      <!-- UComboBox takes plain UObjects as items; they are declared as child elements
+           (the element tag is a UClass name). UMG exposes no refresh API for this
+           widget, so the setter refreshes the cached Slate widget after the write. -->
+      <ComboBox Name="ObjectCombo">
+        <Items>
+          <DataTable Name="ObjectItemA" />
+          <DataTable Name="ObjectItemB" />
+        </Items>
+      </ComboBox>
+    </CanvasPanel>
+  </WidgetTree>
+</WidgetBlueprint>

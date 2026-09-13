@@ -36,7 +36,10 @@ call :run_test "TestStyleSheetInline" "StyleSheet (inline)" || exit /b 1
 call :run_test "TestStyleSheetOverride" "StyleSheet (inherit standalone file + override)" || exit /b 1
 call :run_test "TestStarshipStyle" "Framework style sheets (core + editor layer, inherit + override)" || exit /b 1
 call :run_test "TestListView" "ListView + ObservableCollection" || exit /b 1
-call :run_test "TestArrayBinding" "Array values (property elements + data binding)" || exit /b 1
+call :run_test "TestComboBoxString" "ComboBoxString options and selection (XML + binding, late update)" || exit /b 1
+call :run_test "TestComboBoxKey" "ComboBoxKey options and selection" || exit /b 1
+call :run_test "TestComboBox" "ComboBox (object) item list" || exit /b 1
+call :run_test "TestRichTextBlock" "RichTextBlock basics" || exit /b 1
 call :run_test "TestDynamicChild" "Dynamic add_child / remove_child / get_child" || exit /b 1
 call :run_test "TestDelegateLeak" "Delegate binding leak (add/remove delegate-bound child)" || exit /b 1
 call :run_test "TestStaticChild" "Static child widget blueprint + get_child / remove_child" || exit /b 1

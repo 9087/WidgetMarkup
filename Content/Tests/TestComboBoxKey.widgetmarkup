@@ -1,0 +1,9 @@
+<WidgetBlueprint Script="Tests.TestComboBoxKey">
+  <WidgetTree>
+    <CanvasPanel>
+      <!-- Both properties come from bindings; Options is a TArray<FName> and has no
+           refresh API in UMG, so the setter rebuilds it with ClearOptions()/AddOption(). -->
+      <ComboBoxKey Name="KeyCombo" Options="{key_options}" SelectedOption="{key_selection}" />
+    </CanvasPanel>
+  </WidgetTree>
+</WidgetBlueprint>
