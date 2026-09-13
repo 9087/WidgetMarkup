@@ -44,7 +44,7 @@
 #include "ElementNodes/BlueprintVariableElementNode.h"
 #include "ElementNodes/PropertyChainHandle.h"
 #include "ElementNodes/WidgetMarkupBlueprintVariable.h"
-#include "PropertySetters/ListViewListItemsPropertySetter.h"
+#include "PropertySetters/ResyncPropertySetter.h"
 #include "PropertyRuns/BlueprintImplementsPropertyRun.h"
 #include "PropertyRuns/BlueprintSuperPropertyRun.h"
 #include "PropertyRuns/ListViewListItemsPropertyRun.h"
@@ -159,7 +159,14 @@ void FWidgetMarkupModule::StartupModule()
 	RegisterCustomPropertyRun(UWidget::StaticClass(), TEXT("Style"), FOnCreatePropertyRun::CreateStatic(&FWidgetStylePropertyRun::Create));
 	RegisterCustomPropertyRun(UWidgetStyleSheet::StaticClass(), TEXT("Inherit"), FOnCreatePropertyRun::CreateStatic(&FStyleSheetInheritPropertyRun::Create));
 	RegisterCustomPropertyRun(FWidgetMarkupBlueprintVariable::StaticStruct(), TEXT("Default"), FOnCreatePropertyRun::CreateStatic(&FVariableDefaultPropertyRun::Create));
-	RegisterCustomPropertySetter(UListView::StaticClass(), TEXT("ListItems"), FOnCreatePropertySetter::CreateStatic(&FListViewListItemsPropertySetter::Create));
+	// Properties whose plain copy is not the correct runtime operation: the engine
+	// reads them only at construction, or only through a dedicated API.
+	RegisterPropertyResync<UListView, TArray<UObject*>>(TEXT("ListItems"),
+		[](UListView& ListView, const TArray<UObject*>& Items)
+		{
+			// Transient runtime state: the engine API also notifies OnItemsChanged.
+			ListView.SetListItems(Items);
+		});
 	
 	FCoreDelegates::OnPostEngineInit.AddRaw(this, &FWidgetMarkupModule::OnPostEngineInit);
 }
@@ -376,6 +383,39 @@ TSharedRef<IPropertyRun> FWidgetMarkupModule::CreatePropertyRun(UStruct* InStruc
 	}
 
 	return MakeShared<FPropertyRun>();
+}
+
+bool FWidgetMarkupModule::RegisterPropertyResync(UStruct* InStruct, FName InPropertyPath, FPropertyResyncDelegate InResync, bool (*InIsCompatible)(const FProperty&), const TCHAR* InExpectedTypeName)
+{
+	if (!InStruct || !InResync)
+	{
+		UE_LOG(LogWidgetMarkup, Error, TEXT("RegisterPropertyResync: invalid struct or empty callback."));
+		return false;
+	}
+
+	// Only direct properties are supported: with the exact-path dispatch below this
+	// also guarantees that the tail container passed to the setter is the widget
+	// object itself, not a nested struct.
+	FProperty* Property = InStruct->FindPropertyByName(InPropertyPath);
+	if (!Property)
+	{
+		UE_LOG(LogWidgetMarkup, Error, TEXT("RegisterPropertyResync failed: '%s' has no direct property '%s'."),
+			*InStruct->GetName(), *InPropertyPath.ToString());
+		return false;
+	}
+
+	if (InIsCompatible && !InIsCompatible(*Property))
+	{
+		UE_LOG(LogWidgetMarkup, Error, TEXT("RegisterPropertyResync failed: '%s.%s' is a '%s', which cannot hold '%s'."),
+			*InStruct->GetName(), *InPropertyPath.ToString(), *Property->GetClass()->GetName(),
+			InExpectedTypeName ? InExpectedTypeName : TEXT("<unknown>"));
+		return false;
+	}
+
+	return RegisterCustomPropertySetter(InStruct, InPropertyPath, FOnCreatePropertySetter::CreateLambda([InResync = MoveTemp(InResync)]()
+	{
+		return FResyncPropertySetter::Create(InResync);
+	}));
 }
 
 TSharedPtr<FPropertySetter> FWidgetMarkupModule::CreateCustomPropertySetter(UStruct* InStruct, FName InPropertyPath) const

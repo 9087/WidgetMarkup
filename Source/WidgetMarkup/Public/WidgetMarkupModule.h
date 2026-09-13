@@ -10,6 +10,8 @@
 #include "PropertyBuffer.h"
 #include "PropertyRun.h"
 #include "PropertySetter.h"
+#include "PropertyValue.h"
+#include "Templates/Function.h"
 #include "Utilities/WidgetPropertyPath.h"
 #include "WidgetMarkupScriptIntegration.h"
 
@@ -136,6 +138,57 @@ public:
 		{
 			UnregisterCustomPropertySetter(T::StaticStruct(), InPropertyPath);
 		}
+	}
+
+	/**
+	 * Registers a setter that writes a property and then re-syncs the widget, for
+	 * properties where a plain copy is not the correct runtime operation (the
+	 * engine reads them only at construction, or only through a dedicated API).
+	 *
+	 * Unlike RegisterCustomPropertySetter this validates the registration: the
+	 * property must exist directly on InStruct, and - when the typed overload is
+	 * used - must match the registered value type. A failed registration logs an
+	 * error instead of silently never firing.
+	 *
+	 * Only direct properties are supported, which is also what lets the setter
+	 * treat the target container as the widget object.
+	 *
+	 * InResync is an FPropertyResyncDelegate (see PropertySetter.h). InIsCompatible
+	 * and InExpectedTypeName come from TPropertyValue<TValue> (see PropertyValue.h);
+	 * the type name is used for the diagnostic only and is not stored.
+	 */
+	bool RegisterPropertyResync(UStruct* InStruct, FName InPropertyPath, FPropertyResyncDelegate InResync,
+		bool (*InIsCompatible)(const FProperty&) = nullptr, const TCHAR* InExpectedTypeName = nullptr);
+
+	/** Registers a setter for a property of the given value type, e.g. TArray<FString>. */
+	template <typename TWidget, typename TValue>
+	bool RegisterPropertyResync(UStruct* InStruct, FName InPropertyPath, TFunction<void(TWidget&, const TValue&)> InResync)
+	{
+		return RegisterPropertyResync(InStruct, InPropertyPath,
+			[InResync = MoveTemp(InResync)](UObject& InTarget, const FProperty& InProperty, const void* InValueAddress)
+			{
+				TWidget* Target = Cast<TWidget>(&InTarget);
+				if (!Target)
+				{
+					return;
+				}
+
+				// Read through the property: the value handed to the callback is
+				// always a copy, never a reference into the property memory that the
+				// callback is about to rewrite.
+				TValue Value;
+				TPropertyValue<TValue>::Read(InProperty, InValueAddress, Value);
+				InResync(*Target, Value);
+			},
+			&TPropertyValue<TValue>::IsCompatible,
+			*TPropertyValue<TValue>::GetTypeName());
+	}
+
+	template <typename TWidget, typename TValue>
+	bool RegisterPropertyResync(FName InPropertyPath, TFunction<void(TWidget&, const TValue&)> InResync)
+	{
+		static_assert(TIsDerivedFrom<TWidget, UObject>::Value, "RegisterPropertyResync requires a UObject type.");
+		return RegisterPropertyResync(TWidget::StaticClass(), InPropertyPath, MoveTemp(InResync));
 	}
 
 	TSharedPtr<FPropertySetter> CreateCustomPropertySetter(UStruct* InStruct, FName InPropertyPath) const;
