@@ -266,6 +266,23 @@ Literal (non-binding) values are converted by UE's property system:
 
 > **ObjectProperty asset path conversion:** Properties of type `ObjectProperty` (e.g., `Brush.ResourceObject`, `Font.FontObject`) accept asset paths like `"/Game/Textures/MyIcon"` which are loaded via `StaticLoadObject`. If the path fails, and the property is `Font.FontObject` on `FSlateFontInfo`, the system falls back to loading a system font by name (e.g., `Font.FontObject='seguisym'`).
 
+**Containers (`TArray`/`TSet`/`TMap`) are written with child elements, never as a string.** For a widget property the child element is the property name, and its children are the entries:
+
+```xml
+<ComboBoxString SelectedOption="Alpha">
+  <DefaultOptions>
+    <String>Alpha</String>
+    <String>Beta</String>
+  </DefaultOptions>
+</ComboBoxString>
+```
+
+- `DefaultOptions="Alpha,Beta"` → compile error: `Failed to set value for property path 'DefaultOptions'.`
+- `<String>Alpha</String>` directly under the widget → compile error: `BasicTypeElementNode: cannot resolve element property for 'String'.` (children of a widget element are resolved as **property names**, which also keeps them unambiguous when a widget has several container properties)
+- the same string value inside a **style setter** → **silently ignored** (no error, no warning) — use child elements there as well
+
+A few widget properties are consumed by the engine before a markup value can reach them, or only through a dedicated API (e.g. `ComboBoxString.DefaultOptions` and `SelectedOption`, `ListView.ListItems`). The framework registers dedicated setters for those, so the XML form and the `{binding}` form both work, including changes made at runtime.
+
 ## 4. Python & ListView
 
 See [docs/python-components.md](docs/python-components.md) for the complete Python component development guide, design principles, and ListView setup.
