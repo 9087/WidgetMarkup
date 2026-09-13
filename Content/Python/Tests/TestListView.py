@@ -35,6 +35,18 @@ class TestListView(TestComponent):
             self.items.clear()
             self.check_equal(len(self.items), 0, "after clear length == 0")
 
+            # Inline items: GetNumItems() reads ListItems itself, so these only pass when
+            # the deferred style assignment reached this instance.
+            inline_view = self.find_widget("InlineList")
+            self.check_not_none(inline_view, "inline list found")
+            self.check_equal(inline_view.get_num_items(), 3, "three inline items")
+            for index, expected in enumerate(("InlineItemA", "InlineItemB", "InlineItemC")):
+                item = inline_view.get_item_at(index)
+                self.check_equal(str(item.get_name()) if item else None, expected, f"inline item {index} name")
+                self.check_equal(
+                    item.get_class().get_name() if item else None, "DataTable", f"inline item {index} class"
+                )
+
             self.report()
         finally:
             if widget_markup.Application.is_test_mode():

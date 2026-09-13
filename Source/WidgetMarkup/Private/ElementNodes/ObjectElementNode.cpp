@@ -44,6 +44,13 @@ FElementNode::FResult FObjectElementNode::OnBegin(const FContext& Context, UObje
 	}
 	auto Class = CastChecked<UClass>(Struct);
 
+	if (Class->HasAnyClassFlags(CLASS_Abstract))
+	{
+		return FResult::Failure().Error(FText::Format(
+			FText::FromString(TEXT("ObjectElementNode: class '{0}' is abstract and cannot be instantiated. Element data (an asset path) could reference an existing instance instead.")),
+			FText::FromString(Class->GetName())));
+	}
+
 	if (!ObjectPath.IsEmpty())
 	{
 		// Path-reference mode: load existing asset.

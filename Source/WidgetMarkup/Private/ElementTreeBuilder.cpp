@@ -49,10 +49,15 @@ bool FElementTreeBuilder::ProcessElement(const TCHAR* ElementName, const TCHAR* 
 		TSharedRef<IPropertyRun> PropertyRun = WidgetMarkupModule->CreatePropertyRun(OwnerStruct, FName(*ElementNameString));
 		FStringView PropertyName(*ElementNameString);
 		FStringView PropertyValue(ElementData ? ElementData : TEXT(""));
-		if (PropertyRun->OnBegin(Context, Object, PropertyName, PropertyValue))
+		FElementNode::FResult PropertyRunResult = PropertyRun->OnBegin(Context, Object, PropertyName, PropertyValue);
+		if (PropertyRunResult)
 		{
 			return true;
 		}
+
+		// Keep the reason: without it the parse just aborts and the log only says
+		// "User aborted the parsing process".
+		CaptureFirstError(PropertyRunResult);
 	}
 
 	if (ElementNode)

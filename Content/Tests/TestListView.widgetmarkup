@@ -1,7 +1,23 @@
 <WidgetBlueprint Script="Tests.TestListView">
   <WidgetTree>
     <CanvasPanel>
+      <!-- Bound list: items come from the component's ObservableCollection. -->
       <ListView Name="TestListView" ListItems="{items}" EntryWidgetClass="/WidgetMarkup/Tests/TestChild" />
+
+      <!-- Inline list: the child elements of <ListItems> are the items. The element tag is
+           a UClass name (case-sensitive, no U prefix); element data would be an asset path
+           to reference an existing object instead of creating one.
+
+           ListItems is transient runtime state that an instance does not inherit from the
+           template, so these items are captured while the blueprint compiles and applied to
+           every instance through the style sheet. -->
+      <ListView Name="InlineList" EntryWidgetClass="/WidgetMarkup/Tests/TestChild">
+        <ListItems>
+          <DataTable Name="InlineItemA" />
+          <DataTable Name="InlineItemB" />
+          <DataTable Name="InlineItemC" />
+        </ListItems>
+      </ListView>
     </CanvasPanel>
   </WidgetTree>
 </WidgetBlueprint>

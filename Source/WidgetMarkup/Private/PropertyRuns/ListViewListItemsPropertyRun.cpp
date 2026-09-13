@@ -50,8 +50,11 @@ FElementNode::FResult FListViewListItemsPropertyRun::OnBegin(FElementNode::FCont
 		return FElementNode::FResult::Success();
 	}
 
+	// The children are assembled by the generic property-element path, which writes
+	// them into the widget tree template. No buffered root value is used: ListItems
+	// holds object references, and a string cannot produce one.
 	const FString LiteralPropertyValue = UnescapeWidgetPropertyBindingLiteral(PropertyValue);
-	TSharedPtr<FPropertyElementNode> NewPropertyElementNode = MakeShared<FPropertyElementNode>(TEXT("ListItems"), LiteralPropertyValue, true);
+	TSharedPtr<FPropertyElementNode> NewPropertyElementNode = MakeShared<FPropertyElementNode>(TEXT("ListItems"), LiteralPropertyValue, false);
 	FElementNode::FResult Result = NewPropertyElementNode->Begin(Context, ListView, nullptr);
 	if (!Result)
 	{
@@ -71,51 +74,6 @@ FElementNode::FResult FListViewListItemsPropertyRun::OnEnd(FElementNode::FContex
 		return FElementNode::FResult::Success();
 	}
 
-	const TSharedPtr<const FPropertyBuffer> CachedPropertyBuffer = PropertyElementNode->GetPropertyBuffer();
-	if (!CachedPropertyBuffer.IsValid() || !CachedPropertyBuffer->GetValueData())
-	{
-		Context.Pop();
-		PropertyElementNode.Reset();
-		return FElementNode::FResult::Failure().Error(FText::FromString(TEXT("Failed to finalize ListItems property: cached buffered data is invalid or uninitialized.")));
-	}
-
-	FArrayProperty* BufferedArrayProperty = CastField<FArrayProperty>(CachedPropertyBuffer->GetProperty());
-	if (!BufferedArrayProperty)
-	{
-		Context.Pop();
-		PropertyElementNode.Reset();
-		return FElementNode::FResult::Failure().Error(FText::FromString(TEXT("Failed to finalize ListItems property: cached buffered root property is not an array.")));
-	}
-
-	FObjectPropertyBase* BufferedInnerObjectProperty = CastField<FObjectPropertyBase>(BufferedArrayProperty->Inner);
-	if (!BufferedInnerObjectProperty)
-	{
-		Context.Pop();
-		PropertyElementNode.Reset();
-		return FElementNode::FResult::Failure().Error(FText::FromString(TEXT("Failed to finalize ListItems property: cached buffered array inner type is not an object property.")));
-	}
-
-	TArray<UObject*> ListItemsSnapshot;
-	{
-		FScriptArrayHelper BufferedArrayHelper(BufferedArrayProperty, CachedPropertyBuffer->GetValueData());
-		const int32 BufferedNum = BufferedArrayHelper.Num();
-		ListItemsSnapshot.Reserve(BufferedNum);
-		for (int32 BufferedIndex = 0; BufferedIndex < BufferedNum; ++BufferedIndex)
-		{
-			void* BufferedElementPointer = BufferedArrayHelper.GetRawPtr(BufferedIndex);
-			if (!BufferedElementPointer)
-			{
-				continue;
-			}
-
-			UObject* BufferedListItem = BufferedInnerObjectProperty->GetObjectPropertyValue(BufferedElementPointer);
-			if (BufferedListItem)
-			{
-				ListItemsSnapshot.Add(BufferedListItem);
-			}
-		}
-	}
-
 	UListView* ListView = Context.FindObject<UListView>();
 	if (!ListView)
 	{
@@ -124,6 +82,8 @@ FElementNode::FResult FListViewListItemsPropertyRun::OnEnd(FElementNode::FContex
 		return FElementNode::FResult::Failure().Error(FText::FromString(TEXT("Failed to finalize ListItems property: no UListView object was found in context.")));
 	}
 
+	// Let the property element node assemble its child elements into the ListView on
+	// the widget tree template before the result is snapshotted.
 	FElementNode::FResult Result = PropertyElementNode->End();
 	Context.Pop();
 	PropertyElementNode.Reset();
@@ -132,23 +92,50 @@ FElementNode::FResult FListViewListItemsPropertyRun::OnEnd(FElementNode::FContex
 		return Result;
 	}
 
-	// Store the entire ListItemsSnapshot as a single FWidgetStyleEntry in the default StyleSheet
-	UWidgetBlueprint* WidgetBlueprint = Context.FindObject<UWidgetBlueprint>();
-	if (WidgetBlueprint)
+	// ListItems is transient runtime state, so the value that was just written into
+	// the template never reaches a widget instance. Snapshot it and defer it as a
+	// per-widget style assignment instead, which is applied to every instance.
+	FArrayProperty* ListItemsProperty = FindFProperty<FArrayProperty>(UListView::StaticClass(), TEXT("ListItems"));
+	const FObjectPropertyBase* ItemsInnerProperty = ListItemsProperty ? CastField<FObjectPropertyBase>(ListItemsProperty->Inner) : nullptr;
+	if (!ListItemsProperty || !ItemsInnerProperty)
 	{
-		UWidgetMarkupBlueprintExtension* WidgetMarkupBlueprintExtension = UWidgetBlueprintExtension::GetExtension<UWidgetMarkupBlueprintExtension>(WidgetBlueprint);
-		if (WidgetMarkupBlueprintExtension)
-		{
-			FWidgetStyleEntry Entry;
-			Entry.TargetType = UListView::StaticClass()->GetFName();
-			Entry.Name = FName(*FString::Printf(TEXT("ListItemsDeferredSetter_%s"), *ListView->GetName()));
-			FWidgetStyleSetter Setter;
-			Setter.Property = FWidgetPropertyPath(TEXT("ListItems"));
-			Setter.Buffer = *CachedPropertyBuffer;
-			Entry.Setters.Add(Setter);
-			WidgetMarkupBlueprintExtension->GetStyleSheet()->AddOrReplaceStyleEntry(Entry);
-			WidgetMarkupBlueprintExtension->AddWidgetStyleAssignment(ListView->GetFName(), Entry.Name);
-		}
+		return FElementNode::FResult::Failure().Error(FText::FromString(TEXT("Failed to finalize ListItems property: UListView::ListItems is not an object array.")));
 	}
+
+	void* ListItemsAddress = ListItemsProperty->ContainerPtrToValuePtr<void>(ListView);
+	if (!ListItemsAddress)
+	{
+		return FElementNode::FResult::Failure().Error(FText::FromString(TEXT("Failed to finalize ListItems property: could not resolve the ListItems value address.")));
+	}
+
+	const FPropertyBuffer ListItemsSnapshot(ListItemsProperty);
+	if (!ListItemsSnapshot.HasValue())
+	{
+		return FElementNode::FResult::Failure().Error(FText::FromString(TEXT("Failed to finalize ListItems property: could not allocate a value buffer.")));
+	}
+	ListItemsProperty->CopyCompleteValue(ListItemsSnapshot.GetValueData(), ListItemsAddress);
+
+	// Store the snapshot as a single FWidgetStyleEntry in the default StyleSheet.
+	UWidgetBlueprint* WidgetBlueprint = Context.FindObject<UWidgetBlueprint>();
+	if (!WidgetBlueprint)
+	{
+		return FElementNode::FResult::Failure().Error(FText::FromString(TEXT("Failed to finalize ListItems property: no WidgetBlueprint was found in context.")));
+	}
+
+	UWidgetMarkupBlueprintExtension* WidgetMarkupBlueprintExtension = UWidgetBlueprintExtension::GetExtension<UWidgetMarkupBlueprintExtension>(WidgetBlueprint);
+	if (!WidgetMarkupBlueprintExtension)
+	{
+		return FElementNode::FResult::Failure().Error(FText::FromString(TEXT("Failed to finalize ListItems property: the WidgetMarkup blueprint extension is missing.")));
+	}
+
+	FWidgetStyleEntry Entry;
+	Entry.TargetType = UListView::StaticClass()->GetFName();
+	Entry.Name = FName(*FString::Printf(TEXT("ListItemsDeferredSetter_%s"), *ListView->GetName()));
+	FWidgetStyleSetter Setter;
+	Setter.Property = FWidgetPropertyPath(TEXT("ListItems"));
+	Setter.Buffer = ListItemsSnapshot;
+	Entry.Setters.Add(Setter);
+	WidgetMarkupBlueprintExtension->GetStyleSheet()->AddOrReplaceStyleEntry(Entry);
+	WidgetMarkupBlueprintExtension->AddWidgetStyleAssignment(ListView->GetFName(), Entry.Name);
 	return FElementNode::FResult::Success();
 }
