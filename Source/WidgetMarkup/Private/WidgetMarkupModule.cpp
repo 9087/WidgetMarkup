@@ -8,19 +8,15 @@
 #include "Editor/TransBuffer.h"
 #include "ElementNodeFactory.h"
 #include "FastXml.h"
-#include "WidgetBlueprint.h"
 #include "ElementTreeBuilder.h"
 #include "IDirectoryWatcher.h"
 #include "IRemoteControlModule.h"
 #include "RemoteControlPreset.h"
 #include "WidgetMarkupSettings.h"
 #include "WidgetMarkupLibrary.h"
-#include "Blueprint/WidgetTree.h"
 #include "Engine/Blueprint.h"
-#include "Components/ContentWidget.h"
-#include "Components/ComboBoxString.h"
 #include "Components/Image.h"
-#include "Components/ListView.h"
+#include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/SlateWrapperTypes.h"
@@ -34,8 +30,6 @@
 #include "Converters/MarginConverter.h"
 #include "Converters/NameConverter.h"
 #include "Converters/NumericConverter.h"
-#include "Converters/SlateChildSizeConverter.h"
-#include "Converters/SlateColorConverter.h"
 #include "Converters/StringConverter.h"
 #include "Converters/TextConverter.h"
 #include "Converters/VectorConverter.h"
@@ -48,25 +42,17 @@
 #include "PropertySetters/ResyncPropertySetter.h"
 #include "PropertyRuns/BlueprintImplementsPropertyRun.h"
 #include "PropertyRuns/BlueprintSuperPropertyRun.h"
-#include "PropertyRuns/DeferredPropertyRun.h"
 #include "PropertyRuns/ObjectNamePropertyRun.h"
 #include "PropertyRuns/StyleSheetInheritPropertyRun.h"
-#include "PropertyRuns/WidgetStylePropertyRun.h"
-#include "PropertyRuns/WidgetBlueprintScriptPropertyRun.h"
 #include "PropertyRuns/WidgetDelegatePropertyRun.h"
 #include "PropertyRuns/VariableDefaultPropertyRun.h"
+#include "Registrations/WidgetRegistrations.h"
 #include "Styles/WidgetStyleSheet.h"
-#include "Types/SlateVector2.h"
 #include "Utilities/WidgetPropertyPath.h"
-#include "ElementNodes/ContentWidgetElementNode.h"
-#include "ElementNodes/PanelWidgetElementNode.h"
 #include "ElementNodes/SetterElementNode.h"
 #include "ElementNodes/StyleElementNode.h"
 #include "ElementNodes/StyleSheetElementNode.h"
 #include "ElementNodes/StructElementNode.h"
-#include "ElementNodes/WidgetBlueprintElementNode.h"
-#include "ElementNodes/WidgetElementNode.h"
-#include "ElementNodes/WidgetTreeElementNode.h"
 #include "Interfaces/IPluginManager.h"
 #include "Misc/PackageName.h"
 
@@ -90,51 +76,6 @@ FWidgetMarkupModule& FWidgetMarkupModule::Get()
 	return FModuleManager::GetModuleChecked<FWidgetMarkupModule>("WidgetMarkup");
 }
 
-namespace
-{
-	/**
-	 * Applies UComboBoxString::SelectedOption the way the widget itself would.
-	 *
-	 * UComboBoxString::SetSelectedIndex() updates the content area only when the
-	 * property differs from the option it is about to select, and the generic
-	 * property write already stored the new value - so the selection would be
-	 * remembered but never drawn (GetSelectedOption() would even report success,
-	 * because it reads the internal pointer). Rewinding the property forces a real
-	 * change; the widget then writes it back itself.
-	 *
-	 * @param Selection by value on purpose: the caller may hand over a value that
-	 *        aliases the property memory this function rewrites.
-	 */
-	void SelectComboBoxOption(UComboBoxString& ComboBox, FString Selection)
-	{
-		// SelectedOption is private, so reflection is the only way in.
-		FStrProperty* SelectionProperty = FindFProperty<FStrProperty>(UComboBoxString::StaticClass(), TEXT("SelectedOption"));
-		if (!SelectionProperty)
-		{
-			return;
-		}
-
-		void* SelectionAddress = SelectionProperty->ContainerPtrToValuePtr<void>(&ComboBox);
-		if (Selection.IsEmpty())
-		{
-			ComboBox.ClearSelection();
-			SelectionProperty->SetPropertyValue(SelectionAddress, FString());
-			return;
-		}
-
-		SelectionProperty->SetPropertyValue(SelectionAddress, FString());
-		ComboBox.SetSelectedOption(Selection);
-
-		if (SelectionProperty->GetPropertyValue(SelectionAddress) != Selection)
-		{
-			// The option is not in the list: nothing can be drawn, so drop the shown
-			// item but keep the requested value for a later DefaultOptions write.
-			ComboBox.ClearSelection();
-			SelectionProperty->SetPropertyValue(SelectionAddress, Selection);
-		}
-	}
-}
-
 void FWidgetMarkupModule::StartupModule()
 {
 	// Ensure the plugin's Content directory is mounted so subsystems (e.g. PythonScriptPlugin)
@@ -154,12 +95,7 @@ void FWidgetMarkupModule::StartupModule()
 		UE_LOG(LogWidgetMarkup, Warning, TEXT("Failed to locate plugin 'WidgetMarkup' while mounting Content directory."));
 	}
 
-	FElementNodeFactory::Get().Register<UWidgetTree>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FWidgetTreeElementNode::Create));
-	FElementNodeFactory::Get().Register<UWidget>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FWidgetElementNode::Create));
-	FElementNodeFactory::Get().Register<UPanelWidget>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FPanelWidgetElementNode::Create));
-	FElementNodeFactory::Get().Register<UContentWidget>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FContentWidgetElementNode::Create));
 	FElementNodeFactory::Get().Register<UBlueprint>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FBlueprintElementNode::Create));
-	FElementNodeFactory::Get().Register<UWidgetBlueprint>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FWidgetBlueprintElementNode::Create));
 	FElementNodeFactory::Get().Register<FWidgetMarkupBlueprintVariable>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FBlueprintVariableElementNode::Create), FElementNodeFactory::FRegisterOptions{FString(TEXT("Variable"))});
 	FElementNodeFactory::Get().Register<FWidgetMarkupKeyValuePair>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FStructElementNode::Create), FElementNodeFactory::FRegisterOptions{FString(TEXT("Pair"))});
 	FElementNodeFactory::Get().Register<UWidgetStyleSheet>(FElementNodeFactory::FOnCreateElementNode::CreateStatic(FStyleSheetElementNode::Create), FElementNodeFactory::FRegisterOptions{FString(TEXT("StyleSheet"))});
@@ -187,11 +123,8 @@ void FWidgetMarkupModule::StartupModule()
 	FConverterRegistry::Get().Register(NAME_Color, FConverterRegistry::FOnCreateConverter::CreateStatic(FColorConverter::Create));
 	FConverterRegistry::Get().Register(NAME_LinearColor, FConverterRegistry::FOnCreateConverter::CreateStatic(FLinearColorConverter::Create));
 	FConverterRegistry::Get().Register(FMargin::StaticStruct()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(FMarginConverter::Create));
-	FConverterRegistry::Get().Register(FSlateChildSize::StaticStruct()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(FSlateChildSizeConverter::Create));
-	FConverterRegistry::Get().Register(FSlateColor::StaticStruct()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(FSlateColorConverter::Create));
 	FConverterRegistry::Get().Register(NAME_Vector, FConverterRegistry::FOnCreateConverter::CreateStatic(TVectorConverter<FVector::FReal, 3>::Create));
 	FConverterRegistry::Get().Register(NAME_Vector2D, FConverterRegistry::FOnCreateConverter::CreateStatic(TVectorConverter<FVector2D::FReal, 2>::Create));
-	FConverterRegistry::Get().Register(StaticStruct<FDeprecateSlateVector2D>()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(TVectorConverter<decltype(FDeprecateSlateVector2D::X), 2>::Create));
 	FConverterRegistry::Get().Register(TBaseStructure<FVector4>::Get()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(TVectorConverter<decltype(FVector4::X), 4>::Create));
 	FConverterRegistry::Get().Register(FWidgetPropertyPath::StaticStruct()->GetFName(), FConverterRegistry::FOnCreateConverter::CreateStatic(FWidgetPropertyPathConverter::Create));
 	FConverterRegistry::Get().Register(NAME_ObjectProperty, FConverterRegistry::FOnCreateConverter::CreateStatic(FObjectConverter::Create));
@@ -200,66 +133,17 @@ void FWidgetMarkupModule::StartupModule()
 	RegisterCustomPropertyRun(UObject::StaticClass(), TEXT("Name"), FOnCreatePropertyRun::CreateStatic(&FObjectNamePropertyRun::Create));
 	RegisterCustomPropertyRun(UBlueprint::StaticClass(), TEXT("Super"), FOnCreatePropertyRun::CreateStatic(&FBlueprintSuperPropertyRun::Create));
 	RegisterCustomPropertyRun(UBlueprint::StaticClass(), TEXT("Implements"), FOnCreatePropertyRun::CreateStatic(&FBlueprintImplementsPropertyRun::Create));
-	RegisterCustomPropertyRun(UWidgetBlueprint::StaticClass(), TEXT("Script"), FOnCreatePropertyRun::CreateStatic(&FWidgetBlueprintScriptPropertyRun::Create));
-	// ListItems is transient runtime state, so a value written into the template never
-	// reaches an instance; the deferred run captures it and applies it per instance.
-	RegisterCustomPropertyRun(UListView::StaticClass(), TEXT("ListItems"), FOnCreatePropertyRun::CreateStatic(&FDeferredPropertyRun::Create));
-	RegisterCustomPropertyRun(UWidget::StaticClass(), TEXT("Style"), FOnCreatePropertyRun::CreateStatic(&FWidgetStylePropertyRun::Create));
 	RegisterCustomPropertyRun(UWidgetStyleSheet::StaticClass(), TEXT("Inherit"), FOnCreatePropertyRun::CreateStatic(&FStyleSheetInheritPropertyRun::Create));
 	RegisterCustomPropertyRun(FWidgetMarkupBlueprintVariable::StaticStruct(), TEXT("Default"), FOnCreatePropertyRun::CreateStatic(&FVariableDefaultPropertyRun::Create));
-	// Properties whose plain copy is not the correct runtime operation: the engine
-	// reads them only at construction (DefaultOptions) or only through a dedicated
-	// API (ListItems, SelectedOption).
-	RegisterPropertyResync<UListView, TArray<UObject*>>(TEXT("ListItems"),
-		[](UListView& ListView, const TArray<UObject*>& Items)
-		{
-			// Transient runtime state: the engine API also notifies OnItemsChanged.
-			ListView.SetListItems(Items);
-		});
 
-	RegisterPropertyResync<UComboBoxString, TArray<FString>>(TEXT("DefaultOptions"),
-		[](UComboBoxString& ComboBox, const TArray<FString>& Options)
-		{
-			// UComboBoxString expands DefaultOptions into its runtime option list only
-			// in PostInitProperties()/PostLoad() and never re-reads it, so rebuild the
-			// list here. ClearOptions() also drops the drawn selection, so read the
-			// pending one (private property: reflection) and restore it afterwards.
-			FStrProperty* SelectionProperty = FindFProperty<FStrProperty>(UComboBoxString::StaticClass(), TEXT("SelectedOption"));
-			void* SelectionAddress = SelectionProperty ? SelectionProperty->ContainerPtrToValuePtr<void>(&ComboBox) : nullptr;
-			const FString PreviousSelection = SelectionAddress ? SelectionProperty->GetPropertyValue(SelectionAddress) : FString();
-
-			ComboBox.ClearOptions();
-			for (const FString& Option : Options)
-			{
-				ComboBox.AddOption(Option);
-			}
-
-			// Restoring the selection is also what makes RebuildWidget() draw the item
-			// when the Slate widget does not exist yet.
-			if (SelectionAddress)
-			{
-				SelectComboBoxOption(ComboBox, PreviousSelection);
-			}
-		});
-
-	RegisterPropertyResync<UComboBoxString, FString>(TEXT("SelectedOption"),
-		[](UComboBoxString& ComboBox, const FString& Selection)
-		{
-			// A plain copy changes the string but leaves SComboBox drawing the item it
-			// was last given.
-			SelectComboBoxOption(ComboBox, Selection);
-		});
+	// UMG/Slate registrations live in Registrations/WidgetRegistrations.cpp.
+	RegisterWidgetRegistrations(*this);
 	
 	FCoreDelegates::OnPostEngineInit.AddRaw(this, &FWidgetMarkupModule::OnPostEngineInit);
 }
 
 void FWidgetMarkupModule::ShutdownModule()
 {
-	FElementNodeFactory::Get().Unregister<UWidgetTree>();
-	FElementNodeFactory::Get().Unregister<UWidget>();
-	FElementNodeFactory::Get().Unregister<UPanelWidget>();
-	FElementNodeFactory::Get().Unregister<UContentWidget>();
-	FElementNodeFactory::Get().Unregister<UWidgetBlueprint>();
 	FElementNodeFactory::Get().Unregister<UBlueprint>();
 	FElementNodeFactory::Get().Unregister<FWidgetMarkupBlueprintVariable>();
 	FElementNodeFactory::Get().Unregister<FWidgetMarkupKeyValuePair>();
@@ -288,11 +172,9 @@ void FWidgetMarkupModule::ShutdownModule()
 	FConverterRegistry::Get().Unregister(NAME_Color);
 	FConverterRegistry::Get().Unregister(NAME_LinearColor);
 	FConverterRegistry::Get().Unregister(FMargin::StaticStruct()->GetFName());
-	FConverterRegistry::Get().Unregister(FSlateChildSize::StaticStruct()->GetFName());
-	FConverterRegistry::Get().Unregister(FSlateColor::StaticStruct()->GetFName());
 	FConverterRegistry::Get().Unregister(NAME_Vector);
 	FConverterRegistry::Get().Unregister(NAME_Vector2D);
-	FConverterRegistry::Get().Unregister(StaticStruct<FDeprecateSlateVector2D>()->GetFName());
+	FConverterRegistry::Get().Unregister(TBaseStructure<FVector4>::Get()->GetFName());
 	FConverterRegistry::Get().Unregister(FWidgetPropertyPath::StaticStruct()->GetFName());
 	FConverterRegistry::Get().Unregister(NAME_ObjectProperty);
 	FConverterRegistry::Get().Unregister(FSoftObjectProperty::StaticClass()->GetFName());
@@ -300,14 +182,11 @@ void FWidgetMarkupModule::ShutdownModule()
 	UnregisterCustomPropertyRun(UObject::StaticClass(), TEXT("Name"));
 	UnregisterCustomPropertyRun(UBlueprint::StaticClass(), TEXT("Super"));
 	UnregisterCustomPropertyRun(UBlueprint::StaticClass(), TEXT("Implements"));
-	UnregisterCustomPropertyRun(UWidgetBlueprint::StaticClass(), TEXT("Script"));
-	UnregisterCustomPropertyRun(UListView::StaticClass(), TEXT("ListItems"));
-	UnregisterCustomPropertyRun(UWidget::StaticClass(), TEXT("Style"));
 	UnregisterCustomPropertyRun(UWidgetStyleSheet::StaticClass(), TEXT("Inherit"));
 	UnregisterCustomPropertyRun(FWidgetMarkupBlueprintVariable::StaticStruct(), TEXT("Default"));
-	UnregisterCustomPropertySetter(UListView::StaticClass(), TEXT("ListItems"));
-	UnregisterCustomPropertySetter(UComboBoxString::StaticClass(), TEXT("DefaultOptions"));
-	UnregisterCustomPropertySetter(UComboBoxString::StaticClass(), TEXT("SelectedOption"));
+
+	// UMG/Slate registrations live in Registrations/WidgetRegistrations.cpp.
+	UnregisterWidgetRegistrations(*this);
 
 	FCoreDelegates::OnPostEngineInit.RemoveAll(this);
 	StopSourceFileWatching();
