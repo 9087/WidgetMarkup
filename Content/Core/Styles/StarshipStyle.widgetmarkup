@@ -15,33 +15,51 @@
     InlineEditableTextBlock 等样式类型 UMG 没有对应控件，无法表达，已省略。
   - FTextBlockStyle 的 HighlightColor / UnderlineBrush 等是 Slate 样式结构体字段，
     UTextBlock 没有对应属性，无法用样式表设置，已省略。
-  - 引擎用贴图表现的地方（FlatButton / Simple*Button），这里先用纯色圆角近似；
-    要还原贴图，给对应 Setter 补 ResourceObject 即可。
+  - 引擎用贴图表现的条目（FlatButton / Simple*Button / ToggleButton / RoundButton）
+    这里**直接引用同一张引擎贴图**：DrawAs=Box + ResourceName 指向
+    Engine/Content/Editor/Slate 下的 PNG，Margin 写归一化后的九宫格边界
+    （BOX_BRUSH 的 Margin 参数与贴图尺寸之比，例如 2/8 = 0.25）。
+    纯色 RoundedBox 复刻不出贴图烘出来的描边与圆角，所以不再用纯色近似。
+    注意这些是编辑器内容，默认不 cook；要用到运行时需要另行迁入项目内容。
+  - 引擎的 hover/pressed 常用 SelectionColor / SelectionColor_Pressed，而
+    EStyleColor 枚举里没有这两个名字，只能写字面值（取运行时 FAppStyle 的实际值，
+    见下方 FlatButton / ToggleButton）。
+  - 有些值不在样式结构体里，而是 UMG 控件的同名属性（Font、ForegroundColor、
+    ContentPadding），控件的默认值会盖掉样式，必须单独再写一遍：
+    UComboBoxString 的 Font 默认 Bold 10、ForegroundColor 默认 #C0C0C0、
+    ContentPadding 默认 (4,2) 且会盖掉 ComboButtonStyle.ContentPadding。
 -->
 <StyleSheet Inherit="/WidgetMarkup/Core/Styles/StarshipCoreStyle">
 
   <!-- ==================== 文本 TextBlock ==================== -->
 
-  <!-- 次要文字：ColorUseRule 的 Foreground_Subdued -->
+  <!-- 文本条目都对应 StarshipStyle.cpp:299-320 那一组
+       FTextBlockStyle(NormalText)...：字体/颜色都从 NormalText 继承，这里只写差异项。
+       注意字体大小要显式写，UMG 的 UTextBlock 默认是 24px。 -->
+
+  <!-- 次要文字：ColorUseRule 用 Foreground_Subdued（跟随控件前景色的弱化版） -->
   <Style TargetType="TextBlock" Name="NormalText.Subdued">
     <Setter Property="ColorAndOpacity.ColorUseRule" Value="UseColor_Foreground_Subdued" />
   </Style>
 
+  <!-- SmallText 的弱化版：8px + Subdued 规则 -->
   <Style TargetType="TextBlock" Name="SmallText.Subdued">
     <Setter Property="Font.Size" Value="8" />
     <Setter Property="ColorAndOpacity.ColorUseRule" Value="UseColor_Foreground_Subdued" />
   </Style>
 
+  <!-- 极小号文字：8px（颜色沿用 NormalText 的动态前景色） -->
   <Style TargetType="TextBlock" Name="TinyText">
     <Setter Property="Font.Size" Value="8" />
   </Style>
 
+  <!-- 极小号 + 弱化 -->
   <Style TargetType="TextBlock" Name="TinyText.Subdued">
     <Setter Property="Font.Size" Value="8" />
     <Setter Property="ColorAndOpacity.ColorUseRule" Value="UseColor_Foreground_Subdued" />
   </Style>
 
-  <!-- 强调文字：Bold + 白色 + 阴影 -->
+  <!-- 强调文字（标题用）：Bold + 白色 + (1,1) 阴影 -->
   <Style TargetType="TextBlock" Name="NormalText.Important">
     <Setter Property="Font.TypefaceFontName" Value="Bold" />
     <Setter Property="ColorAndOpacity" Value="White" />
@@ -49,6 +67,7 @@
     <Setter Property="ShadowColorAndOpacity" Value="0,0,0,0.9" />
   </Style>
 
+  <!-- 大号强调文字：Bold 11 + 白色 + (1,1) 阴影 -->
   <Style TargetType="TextBlock" Name="LargeText">
     <Setter Property="Font.TypefaceFontName" Value="Bold" />
     <Setter Property="Font.Size" Value="11" />
@@ -57,11 +76,13 @@
     <Setter Property="ShadowColorAndOpacity" Value="0,0,0,0.9" />
   </Style>
 
+  <!-- 带阴影的正文（阴影不透明，颜色 = NormalText 前景色 + (1,1) 黑阴影） -->
   <Style TargetType="TextBlock" Name="TextBlock.ShadowedText">
     <Setter Property="ShadowOffset" Value="1,1" />
     <Setter Property="ShadowColorAndOpacity" Value="0,0,0" />
   </Style>
 
+  <!-- 带阴影的警告色文字 -->
   <Style TargetType="TextBlock" Name="TextBlock.ShadowedTextWarning">
     <Setter Property="ColorAndOpacity" Value="Warning" />
     <Setter Property="ShadowOffset" Value="1,1" />
@@ -70,171 +91,222 @@
 
   <!-- ==================== 按钮 Button ==================== -->
 
-  <!-- 无底色，仅 hover 提示（引擎用 Common/FlatButton 贴图，这里纯色近似）。
-       前景色不用写：引擎的 FlatButton 是 FButtonStyle(Button)，也就是拷贝编辑器
-       Button 的白色前景色；UMG 的 UButton 默认样式（FCoreStyle 的 Button）同样是
-       白色，所以留空即可，写成 UseColor_Foreground 反而会继承成 #C0C0C0。 -->
+  <!-- 无底色，仅 hover 提示。按引擎实际画刷翻译（EditorStyle/StarshipStyle.cpp:515-519）：
+         FButtonStyle(Button)
+           .SetNormal (FSlateNoResource())
+           .SetHovered(BOX_BRUSH("Common/FlatButton", 2.0f / 8.0f, SelectionColor))
+           .SetPressed(BOX_BRUSH("Common/FlatButton", 2.0f / 8.0f, SelectionColor_Pressed))
+       BOX_BRUSH(路径, Margin, 色) = FSlateBoxBrush(...)：DrawAs=Box、ImageType=FullColor、
+       ImageSize=ZeroVector，Margin 是归一化 UV —— 九宫格切片尺寸由贴图实际像素算
+       （ElementBatcher.cpp:861 `TextureWidth * Margin.Left`），2.0f/8.0f 对应 8x8 贴图的
+       2px，所以这里必须写 0.25。8x8 的 FlatButton.png = 白底 + 一圈 #CCCCCC 描边 +
+       四角 alpha=0x46 的 1px 圆角，描边随 tint 相乘 —— 引擎扁平按钮「同色深一档描边 +
+       一点点圆角」就是这么来的，纯色 RoundedBox 复刻不出那点圆角，所以直接引用引擎贴图。
+       前景色不用写：引擎的 FlatButton 是 FButtonStyle(Button)，也就是拷贝编辑器 Button 的
+       白色前景色；UMG 的 UButton 默认样式（FCoreStyle 的 Button）同样是白色，留空即可，
+       写成 UseColor_Foreground 反而会继承成 #C0C0C0。
+       注：Box 画刷不读 OutlineSettings（只有 RoundedBox 走描边着色器），但 Core 层隐式
+       Button 条目给所有 SButton 写了 1px 描边 + 半径 4，这里显式清零，让画刷状态和引擎的
+       默认画刷一致，也避免将来改回 RoundedBox 时灰边又冒出来。 -->
   <Style TargetType="Button" Name="FlatButton">
     <Setter Property="WidgetStyle.Normal.DrawAs" Value="NoDrawType" />
-    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Hovered.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Hovered.TintColor" Value="Hover" />
+    <Setter Property="WidgetStyle.Normal.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Hovered.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/FlatButton.png" />
+    <Setter Property="WidgetStyle.Hovered.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Hovered.OutlineSettings.Width" Value="0" />
-    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Pressed.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Pressed.TintColor" Value="PrimaryPress" />
+    <!-- 引擎这两态用的是 SelectionColor / SelectionColor_Pressed（不是 EStyleColor::Hover）；
+         EStyleColor 里没有 SelectionColor，所以写字面值，取运行时 FAppStyle 的实际值：
+         SelectionColor = #18A0FB，SelectionColor_Pressed = FLinearColor(0.701,0.225,0.003)。 -->
+    <Setter Property="WidgetStyle.Hovered.TintColor" Value="0.009134,0.351533,0.964686,1" />
+    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Pressed.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/FlatButton.png" />
+    <Setter Property="WidgetStyle.Pressed.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Pressed.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.Pressed.TintColor" Value="0.701,0.225,0.003,1" />
   </Style>
 
   <Style TargetType="Button" Name="FlatButton.Dark" Base="FlatButton">
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/FlatButton.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.TintColor" Value="0.125,0.125,0.125,0.8" />
   </Style>
 
   <Style TargetType="Button" Name="FlatButton.DarkGrey" Base="FlatButton">
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/FlatButton.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.TintColor" Value="0.05,0.05,0.05,0.8" />
   </Style>
 
   <!--
-    语义色族：引擎用同一张 FlatButton 贴图，三态 = 基色 ×0.8 / ×1.0 / ×0.6。
-    样式表算不了乘法，所以三个态各写一个字面值。
+    语义色族：同一张 FlatButton 贴图，三态 = 基色 ×0.8 / ×1.0 / ×0.6（引擎侧见
+    EditorStyle/StarshipStyle.cpp:543-576 的 ButtonColor）。样式表算不了乘法，
+    所以三个态各写一个字面值；描边不用写，贴图里那圈 #CCCCCC 会跟着 tint 一起乘。
   -->
   <Style TargetType="Button" Name="FlatButton.Primary" Base="FlatButton">
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/FlatButton.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.TintColor" Value="0.0232,0.1580,0.3856,1" />
     <Setter Property="WidgetStyle.Hovered.TintColor" Value="0.0290,0.1975,0.4820,1" />
     <Setter Property="WidgetStyle.Pressed.TintColor" Value="0.0174,0.1185,0.2892,1" />
   </Style>
 
   <Style TargetType="Button" Name="FlatButton.Success" Base="FlatButton">
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/FlatButton.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.TintColor" Value="0.0849,0.3902,0.0849,1" />
     <Setter Property="WidgetStyle.Hovered.TintColor" Value="0.1062,0.4878,0.1062,1" />
     <Setter Property="WidgetStyle.Pressed.TintColor" Value="0.0637,0.2927,0.0637,1" />
   </Style>
 
   <Style TargetType="Button" Name="FlatButton.Info" Base="FlatButton">
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/FlatButton.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.TintColor" Value="0.0829,0.4285,0.5898,1" />
     <Setter Property="WidgetStyle.Hovered.TintColor" Value="0.1036,0.5356,0.7372,1" />
     <Setter Property="WidgetStyle.Pressed.TintColor" Value="0.0622,0.3214,0.4423,1" />
   </Style>
 
   <Style TargetType="Button" Name="FlatButton.Warning" Base="FlatButton">
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/FlatButton.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.TintColor" Value="0.7001,0.3407,0.0591,1" />
     <Setter Property="WidgetStyle.Hovered.TintColor" Value="0.8751,0.4259,0.0738,1" />
     <Setter Property="WidgetStyle.Pressed.TintColor" Value="0.5251,0.2555,0.0443,1" />
   </Style>
 
   <Style TargetType="Button" Name="FlatButton.Danger" Base="FlatButton">
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/FlatButton.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.TintColor" Value="0.5609,0.0677,0.0607,1" />
     <Setter Property="WidgetStyle.Hovered.TintColor" Value="0.7012,0.0846,0.0759,1" />
     <Setter Property="WidgetStyle.Pressed.TintColor" Value="0.4207,0.0508,0.0456,1" />
   </Style>
 
-  <!-- 直角按钮（引擎贴图 simple_sharp_* 是白色底，这里用白色圆角近似） -->
+  <!-- 直角按钮。引擎数据（EditorStyle/StarshipStyle.cpp:377-383）：
+         FButtonStyle()
+           .SetNormal (BOX_BRUSH("Common/Button/simple_sharp_normal",  4/16.0f, FLinearColor(1,1,1,1)))
+           .SetHovered(BOX_BRUSH("Common/Button/simple_sharp_hovered", 4/16.0f, FLinearColor(1,1,1,1)))
+           .SetPressed(BOX_BRUSH("Common/Button/simple_sharp_hovered", 4/16.0f, FLinearColor(1,1,1,1)))
+       16x16 贴图，Margin 4/16 = 0.25：白底 + 一圈 #CCCCCC，四角 alpha 全 255（硬直角）。
+       Disabled 是 FButtonStyle() 的默认值 = 不画（不能继承 Core 层隐式 Button 的圆角框）。
+       前景色：引擎这里是 FButtonStyle()（不是 FButtonStyle(Button)），前景是默认白色。 -->
   <Style TargetType="Button" Name="SimpleSharpButton">
     <Setter Property="WidgetStyle.NormalForeground.ColorUseRule" Value="UseColor_Foreground" />
     <Setter Property="WidgetStyle.HoveredForeground.ColorUseRule" Value="UseColor_Foreground" />
     <Setter Property="WidgetStyle.PressedForeground.ColorUseRule" Value="UseColor_Foreground" />
     <Setter Property="WidgetStyle.DisabledForeground.ColorUseRule" Value="UseColor_Foreground" />
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Normal.TintColor" Value="White" />
-    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Hovered.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Hovered.TintColor" Value="White" />
-    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Pressed.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Pressed.TintColor" Value="White" />
-    <Setter Property="WidgetStyle.Normal.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/Button/simple_sharp_normal.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.OutlineSettings.Width" Value="0" />
-    <Setter Property="WidgetStyle.Normal.OutlineSettings.CornerRadii" Value="1,1,1,1" />
-    <Setter Property="WidgetStyle.Hovered.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Normal.TintColor" Value="White" />
+    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Hovered.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/Button/simple_sharp_hovered.png" />
+    <Setter Property="WidgetStyle.Hovered.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Hovered.OutlineSettings.Width" Value="0" />
-    <Setter Property="WidgetStyle.Hovered.OutlineSettings.CornerRadii" Value="1,1,1,1" />
-    <Setter Property="WidgetStyle.Pressed.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Hovered.TintColor" Value="White" />
+    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Pressed.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/Button/simple_sharp_hovered.png" />
+    <Setter Property="WidgetStyle.Pressed.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Pressed.OutlineSettings.Width" Value="0" />
-    <Setter Property="WidgetStyle.Pressed.OutlineSettings.CornerRadii" Value="1,1,1,1" />
+    <Setter Property="WidgetStyle.Pressed.TintColor" Value="White" />
+    <Setter Property="WidgetStyle.Disabled.DrawAs" Value="NoDrawType" />
     <Setter Property="WidgetStyle.NormalPadding" Value="0,0,0,1" />
     <Setter Property="WidgetStyle.PressedPadding" Value="0,1,0,0" />
   </Style>
 
-  <!-- 圆角按钮（引擎贴图 simple_round_* 是白色底，这里用白色大圆角近似） -->
+  <!-- 圆角按钮。引擎数据（EditorStyle/StarshipStyle.cpp:385-391）：
+         FButtonStyle()
+           .SetNormal (BOX_BRUSH("Common/Button/simple_round_normal",  4/16.0f, FLinearColor(1,1,1,1)))
+           .SetHovered(BOX_BRUSH("Common/Button/simple_round_hovered", 4/16.0f, FLinearColor(1,1,1,1)))
+           .SetPressed(BOX_BRUSH("Common/Button/simple_round_hovered", 4/16.0f, FLinearColor(1,1,1,1)))
+       16x16 贴图，Margin 4/16 = 0.25：白底 + 一圈 #CCCCCC，四角是贴图烘的 4px 圆角。 -->
   <Style TargetType="Button" Name="SimpleRoundButton">
     <Setter Property="WidgetStyle.NormalForeground.ColorUseRule" Value="UseColor_Foreground" />
     <Setter Property="WidgetStyle.HoveredForeground.ColorUseRule" Value="UseColor_Foreground" />
     <Setter Property="WidgetStyle.PressedForeground.ColorUseRule" Value="UseColor_Foreground" />
     <Setter Property="WidgetStyle.DisabledForeground.ColorUseRule" Value="UseColor_Foreground" />
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Normal.TintColor" Value="White" />
-    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Hovered.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Hovered.TintColor" Value="White" />
-    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Pressed.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Pressed.TintColor" Value="White" />
-    <Setter Property="WidgetStyle.Normal.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/Button/simple_round_normal.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.OutlineSettings.Width" Value="0" />
-    <Setter Property="WidgetStyle.Normal.OutlineSettings.CornerRadii" Value="4,4,4,4" />
-    <Setter Property="WidgetStyle.Hovered.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Normal.TintColor" Value="White" />
+    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Hovered.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/Button/simple_round_hovered.png" />
+    <Setter Property="WidgetStyle.Hovered.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Hovered.OutlineSettings.Width" Value="0" />
-    <Setter Property="WidgetStyle.Hovered.OutlineSettings.CornerRadii" Value="4,4,4,4" />
-    <Setter Property="WidgetStyle.Pressed.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.Hovered.TintColor" Value="White" />
+    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Pressed.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/Button/simple_round_hovered.png" />
+    <Setter Property="WidgetStyle.Pressed.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Pressed.OutlineSettings.Width" Value="0" />
-    <Setter Property="WidgetStyle.Pressed.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.Pressed.TintColor" Value="White" />
+    <Setter Property="WidgetStyle.Disabled.DrawAs" Value="NoDrawType" />
     <Setter Property="WidgetStyle.NormalPadding" Value="0,0,0,1" />
     <Setter Property="WidgetStyle.PressedPadding" Value="0,1,0,0" />
   </Style>
 
-  <!-- 切换按钮：无底色，hover/pressed 才出现选中背景；前景色同 FlatButton（引擎的
-       ToggleButton 也是 FButtonStyle(Button)，白色） -->
+  <!-- 切换按钮：无底色，hover/pressed 才出现选中背景。引擎数据
+       （EditorStyle/StarshipStyle.cpp:501-505）：
+         FButtonStyle(Button)
+           .SetNormal (FSlateNoResource())
+           .SetHovered(BOX_BRUSH("Common/RoundedSelection_16x", 4.0f / 16.0f, SelectionColor))
+           .SetPressed(BOX_BRUSH("Common/RoundedSelection_16x", 4.0f / 16.0f, SelectionColor_Pressed))
+       RoundedSelection_16x 是纯白 + 4px 圆角 alpha 遮罩，没有描边；Margin 4/16 = 0.25。
+       前景色同 FlatButton（引擎的 ToggleButton 也是 FButtonStyle(Button)，白色）。 -->
   <Style TargetType="Button" Name="ToggleButton">
     <Setter Property="WidgetStyle.Normal.DrawAs" Value="NoDrawType" />
-    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Hovered.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Hovered.TintColor" Value="Hover" />
+    <Setter Property="WidgetStyle.Normal.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.Hovered.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Hovered.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Hovered.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/RoundedSelection_16x.png" />
+    <Setter Property="WidgetStyle.Hovered.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Hovered.OutlineSettings.Width" Value="0" />
-    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Pressed.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Pressed.TintColor" Value="PrimaryPress" />
+    <Setter Property="WidgetStyle.Hovered.TintColor" Value="0.009134,0.351533,0.964686,1" />
+    <Setter Property="WidgetStyle.Pressed.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Pressed.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Pressed.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/RoundedSelection_16x.png" />
+    <Setter Property="WidgetStyle.Pressed.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Pressed.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.Pressed.TintColor" Value="0.701,0.225,0.003,1" />
   </Style>
 
+  <!-- 圆角按钮。引擎数据（EditorStyle/StarshipStyle.cpp:509-513）：
+         FButtonStyle(Button)
+           .SetNormal (BOX_BRUSH("Common/RoundedSelection_16x", 4.0f / 16.0f, FLinearColor(1,1,1,0.1)))
+           .SetHovered(BOX_BRUSH("Common/RoundedSelection_16x", 4.0f / 16.0f, SelectionColor))
+           .SetPressed(BOX_BRUSH("Common/RoundedSelection_16x", 4.0f / 16.0f, SelectionColor_Pressed))
+       hover/pressed 由 ToggleButton 继承。 -->
   <Style TargetType="Button" Name="RoundButton" Base="ToggleButton">
-    <Setter Property="WidgetStyle.Normal.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.Normal.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.Normal.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.Normal.TintColor" Value="1,1,1,0.1" />
+    <Setter Property="WidgetStyle.Normal.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.Normal.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.Normal.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/RoundedSelection_16x.png" />
+    <Setter Property="WidgetStyle.Normal.Margin" Value="0.25,0.25,0.25,0.25" />
     <Setter Property="WidgetStyle.Normal.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.Normal.TintColor" Value="1,1,1,0.1" />
   </Style>
 
   <!-- ==================== 复选框 CheckBox ==================== -->
@@ -245,6 +317,24 @@
   <Style TargetType="CheckBox" Name="CheckboxLookToggleButtonCheckbox">
     <Setter Property="WidgetStyle.CheckBoxType" Value="ToggleButton" />
     <Setter Property="WidgetStyle.Padding" Value="1,1,1,1" />
+
+    <!-- 引擎数据（EditorStyle/StarshipStyle.cpp:588-602）是 FCheckBoxStyle() 全默认再逐项
+         设图：因此 Background*Image 是默认的「不画」（UMG 默认样式却带一个 18x18 圆角框，
+         必须显式退出），前景色是默认的 UseColor_Foreground（动态），图片 tint 基本是白
+         （只有 Pressed/Hovered 那两个是 0.5 灰）。Core 层隐式 CheckBox 会把勾选图染成
+         Primary 系，所以这里要显式染回白。 -->
+    <Setter Property="WidgetStyle.BackgroundImage.DrawAs" Value="NoDrawType" />
+    <Setter Property="WidgetStyle.BackgroundImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.DrawAs" Value="NoDrawType" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundHoveredImage.OutlineSettings.Width" Value="0" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.DrawAs" Value="NoDrawType" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.BackgroundPressedImage.OutlineSettings.Width" Value="0" />
 
     <Setter Property="WidgetStyle.UncheckedImage.DrawAs" Value="Image" />
     <Setter Property="WidgetStyle.UncheckedImage.ImageType" Value="FullColor" />
@@ -269,6 +359,7 @@
     <Setter Property="WidgetStyle.CheckedImage.ImageType" Value="FullColor" />
     <Setter Property="WidgetStyle.CheckedImage.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/CheckBox_Checked_Hovered.png" />
     <Setter Property="WidgetStyle.CheckedImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.CheckedImage.TintColor" Value="1,1,1,1" />
     <Setter Property="WidgetStyle.CheckedImage.OutlineSettings.Width" Value="0" />
 
     <Setter Property="WidgetStyle.CheckedHoveredImage.DrawAs" Value="Image" />
@@ -282,50 +373,105 @@
     <Setter Property="WidgetStyle.CheckedPressedImage.ImageType" Value="FullColor" />
     <Setter Property="WidgetStyle.CheckedPressedImage.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/CheckBox_Checked.png" />
     <Setter Property="WidgetStyle.CheckedPressedImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.CheckedPressedImage.TintColor" Value="1,1,1,1" />
     <Setter Property="WidgetStyle.CheckedPressedImage.OutlineSettings.Width" Value="0" />
 
     <Setter Property="WidgetStyle.UndeterminedImage.DrawAs" Value="Image" />
     <Setter Property="WidgetStyle.UndeterminedImage.ImageType" Value="FullColor" />
     <Setter Property="WidgetStyle.UndeterminedImage.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/CheckBox_Undetermined.png" />
     <Setter Property="WidgetStyle.UndeterminedImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.UndeterminedImage.TintColor" Value="1,1,1,1" />
     <Setter Property="WidgetStyle.UndeterminedImage.OutlineSettings.Width" Value="0" />
 
     <Setter Property="WidgetStyle.UndeterminedHoveredImage.DrawAs" Value="Image" />
     <Setter Property="WidgetStyle.UndeterminedHoveredImage.ImageType" Value="FullColor" />
     <Setter Property="WidgetStyle.UndeterminedHoveredImage.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/CheckBox_Undetermined_Hovered.png" />
     <Setter Property="WidgetStyle.UndeterminedHoveredImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.UndeterminedHoveredImage.TintColor" Value="1,1,1,1" />
     <Setter Property="WidgetStyle.UndeterminedHoveredImage.OutlineSettings.Width" Value="0" />
+
+    <Setter Property="WidgetStyle.UndeterminedPressedImage.DrawAs" Value="Image" />
+    <Setter Property="WidgetStyle.UndeterminedPressedImage.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.UndeterminedPressedImage.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/CheckBox_Undetermined_Hovered.png" />
+    <Setter Property="WidgetStyle.UndeterminedPressedImage.ImageSize" Value="16,16" />
+    <Setter Property="WidgetStyle.UndeterminedPressedImage.TintColor" Value="0.5,0.5,0.5,1" />
+    <Setter Property="WidgetStyle.UndeterminedPressedImage.OutlineSettings.Width" Value="0" />
+
+    <!-- 前景色：引擎这里是 FCheckBoxStyle 默认的 UseColor_Foreground（动态跟控件前景色走），
+         Core 层隐式 CheckBox 写成了 ForegroundHover 固定色，所以这里要改回动态规则。 -->
+    <Setter Property="WidgetStyle.ForegroundColor.ColorUseRule" Value="UseColor_Foreground" />
+    <Setter Property="WidgetStyle.HoveredForeground.ColorUseRule" Value="UseColor_Foreground" />
+    <Setter Property="WidgetStyle.PressedForeground.ColorUseRule" Value="UseColor_Foreground" />
+    <Setter Property="WidgetStyle.CheckedForeground.ColorUseRule" Value="UseColor_Foreground" />
+    <Setter Property="WidgetStyle.CheckedHoveredForeground.ColorUseRule" Value="UseColor_Foreground" />
+    <Setter Property="WidgetStyle.CheckedPressedForeground.ColorUseRule" Value="UseColor_Foreground" />
+    <Setter Property="WidgetStyle.UndeterminedForeground.ColorUseRule" Value="UseColor_Foreground" />
   </Style>
 
   <!-- ==================== 下拉框 ComboBox ==================== -->
 
-  <!-- 工具栏式下拉：无边框、无菜单边框留白，按钮部分用 ToggleButton 的观感 -->
+  <!-- 工具栏式下拉。引擎数据（EditorStyle/StarshipStyle.cpp:615-620）：
+         FComboButtonStyle()
+           .SetButtonStyle(GetWidgetStyle<FButtonStyle>("ToggleButton"))
+           .SetDownArrowImage(IMAGE_BRUSH("Common/ShadowComboArrow", Icon8x8))
+           .SetMenuBorderBrush(FSlateNoResource())
+           .SetMenuBorderPadding(FMargin(0.0f))
+       ButtonStyle 就是 ToggleButton，所以这里照抄它的三态画刷（Box + RoundedSelection_16x、
+       tint = SelectionColor / SelectionColor_Pressed）。
+       内边距按引擎实际值：FComboButtonStyle 默认 ContentPadding=(5,5,5,5)、
+       DownArrowPadding=(2,2,2,2)；ButtonStyle 是 FButtonStyle(Button)，
+       NormalPadding=ButtonMargins(12,1.5,12,1.5)、PressedPadding=PressedButtonMargins(12,2.5,12,0.5)。
+       这些内边距必须写准：这一行的文本位置对 1px 都很敏感。 -->
   <Style TargetType="ComboBoxString" Name="ToolbarComboButton">
     <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.DrawAs" Value="NoDrawType" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.TintColor" Value="Hover" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/RoundedSelection_16x.png" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.Margin" Value="0.25,0.25,0.25,0.25" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.TintColor" Value="0.009134,0.351533,0.964686,1" />
     <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.OutlineSettings.Width" Value="0" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.DrawAs" Value="RoundedBox" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.ImageType" Value="NoImage" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.ResourceName" Value="None" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.TintColor" Value="PrimaryPress" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.DrawAs" Value="Box" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.ImageType" Value="FullColor" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/RoundedSelection_16x.png" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.Margin" Value="0.25,0.25,0.25,0.25" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.TintColor" Value="0.701,0.225,0.003,1" />
     <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.OutlineSettings.Width" Value="0" />
-    <!-- 引擎 ToolbarComboButton 的按钮部分是 ToggleButton 内边距（ToggleButtonMargin
-         16,2），下箭头是 IMAGE_BRUSH("Common/ShadowComboArrow", Icon8x8)：
-         这里直接引用引擎那张 8x8 PNG，并覆盖 Core 层 ComboBox 的 16x16 chevron。 -->
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.NormalPadding" Value="16,2,16,2" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.PressedPadding" Value="16,2,16,2" />
+    <!-- UMG 的 SComboBox 文字颜色来自控件属性 ForegroundColor（默认 #C0C0C0），
+         引擎这边是 ButtonStyle 的 NormalForeground = ForegroundHover（白），所以显式写。
+         ContentPadding 同理：控件属性会盖掉样式的 ComboButtonStyle.ContentPadding，
+         引擎 ToolbarComboButton 的 FComboButtonStyle 默认是 (5,5,5,5)。 -->
+    <Setter Property="ForegroundColor" Value="ForegroundHover" />
+    <Setter Property="ContentPadding" Value="5,5,5,5" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ContentPadding" Value="5,5,5,5" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.NormalPadding" Value="12,1.5,12,1.5" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.PressedPadding" Value="12,2.5,12,0.5" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowPadding" Value="2,2,2,2" />
+    <!-- 前景色与 Disabled 态也要盖掉核心 ComboBox 的值：ButtonStyle 是 ToggleButton =
+         FButtonStyle(Button)，前景是 ForegroundHover（白），Disabled 是
+         RoundedBox(Dropdown, 4, Recessed, 1) + DisabledForeground(Foreground)。
+         不写的话「Second entry」的文字会继承成 #C0C0C0。 -->
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.NormalForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.HoveredForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.PressedForeground" Value="ForegroundHover" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.DisabledForeground" Value="Foreground" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Disabled.DrawAs" Value="RoundedBox" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Disabled.ImageType" Value="NoImage" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Disabled.ResourceName" Value="None" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Disabled.TintColor" Value="Dropdown" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Disabled.OutlineSettings.RoundingType" Value="FixedRadius" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Disabled.OutlineSettings.CornerRadii" Value="4,4,4,4" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Disabled.OutlineSettings.Color" Value="Recessed" />
+    <Setter Property="WidgetStyle.ComboButtonStyle.ButtonStyle.Disabled.OutlineSettings.Width" Value="1" />
     <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.DrawAs" Value="Image" />
     <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.ImageType" Value="FullColor" />
     <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.ResourceName" Value="../../../Engine/Content/Editor/Slate/Common/ShadowComboArrow.png" />
     <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.ImageSize" Value="8,8" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.TintColor" Value="Foreground" />
+    <!-- 引擎 IMAGE_BRUSH("Common/ShadowComboArrow", Icon8x8) 没有给 tint（默认白）；
+         写成 Foreground(#C0C0C0) 会让箭头偏灰。 -->
+    <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.TintColor" Value="1,1,1,1" />
     <Setter Property="WidgetStyle.ComboButtonStyle.DownArrowImage.OutlineSettings.Width" Value="0" />
     <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderBrush.DrawAs" Value="NoDrawType" />
     <Setter Property="WidgetStyle.ComboButtonStyle.MenuBorderPadding" Value="0,0,0,0" />
-    <Setter Property="WidgetStyle.ComboButtonStyle.ContentPadding" Value="0,0,0,0" />
   </Style>
 
 </StyleSheet>
