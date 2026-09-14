@@ -506,24 +506,66 @@ A named style can start from another named style of the same `TargetType` instea
 
 ## 6. Build & Run
 
-**WidgetMarkupApp** is only the standalone `.exe` launcher. WidgetMarkup itself is the plugin (markup compiler, Python integration, `widget_markup` module, and so on); those APIs are the same whether you run inside WidgetMarkupApp or another host that loads the plugin.
+**WidgetMarkupApp** is only the standalone `.exe` launcher. WidgetMarkup itself is the plugin (markup compiler, Python integration, `widget_markup` module, and so on); those APIs are the same whether you run inside WidgetMarkupApp or another host that loads the plugin. The launcher keeps its own reference in `Game/Source/Programs/WidgetMarkupApp/README.md`.
 
 ```powershell
 # Build
 cd C:\PROJECTS\UnrealEngine
 .\Engine\Build\BatchFiles\Build.bat WidgetMarkupApp Win64 Development -Project=Game/Game.uproject
+```
 
-# Run a plugin sample (mounted at /WidgetMarkup/)
+### 6.1 Package Path and `--project`
+
+`WidgetMarkupApp <PackagePath>` takes a long package path with no file extension. `/WidgetMarkup/` is mounted by the plugin itself; `/Game/` resolves to `<project dir>/Content`, where the project dir is what `--project` names — or, without `--project`, **the directory the viewer was launched from**.
+
+```powershell
+# Plugin sample, project mounted
 .\Game\Binaries\Win64\WidgetMarkupApp.exe /WidgetMarkup/Samples/Counter --project Game/Game.uproject
 
-# Run a project blueprint (mounted at /Game/ — project Content/ directory)
+# The same plugin sample without --project: /Game/ becomes the launch directory
+cd Game
+.\Binaries\Win64\WidgetMarkupApp.exe /WidgetMarkup/Samples/Minesweeper
+
+# Project blueprint (needs --project, since /Game/ is then the project's Content/)
 .\Game\Binaries\Win64\WidgetMarkupApp.exe /Game/ScientificCalculator --project Game/Game.uproject
+```
+
+Running without `--project` loses nothing the viewer itself needs: the target opts its plugins in explicitly (`WidgetMarkupApp.Target.cs` — `ExtraModuleNames` + `AdditionalPlugins` + `EnablePlugins` cover WidgetMarkup, WidgetMarkupPythonScripting, SlateBot, PythonScriptPlugin, RemoteControl and EnhancedInput). Python components, `<SlateBot>` wrapping and Remote Control therefore all work. It is the fastest way to look at a sample — the preview window appears about two seconds after launch, the engine's own 3D game window is hidden, and only the preview window is on screen. What it does *not* have is the project's other plugins (pass `--project` for those) and the editor-side style comparison tooling (`SlateReference` + the `GameEditor` dump helpers).
+
+### 6.2 Preview and Screenshots over Remote Control
+
+The viewer starts the Web Remote Control server on `127.0.0.1:30010` (hard-coded, independent of editor settings), so the same `PUT /remote/object/call` requests that drive the editor drive the viewer:
+
+```powershell
+# Which SlateBot instances are alive (every widget tree wrapped in <SlateBot>)
+{"objectPath":"/Script/SlateBot.Default__SlateBotFunctionLibrary","functionName":"GetSlateBotInstances","parameters":{}}
+
+# Capture one of them — content only, no window chrome
+{"objectPath":"/Script/SlateBot.Default__SlateBotFunctionLibrary","functionName":"CaptureSlateBotScreenshot",
+ "parameters":{"InstanceName":"Minesweeper","OutputPath":"C:/path/shot.png","Width":0,"Height":0}}
+```
+
+- Only widget trees wrapped in `<SlateBot InstanceName="...">` are capturable, which is why the samples put one at the root of the tree.
+- Capture through SlateBot (or `PrintWindow` with `PW_RENDERFULLCONTENT`). A plain screen grab of this window comes back **black** — it is a D3D12 swap chain.
+- The viewer exits when its preview window is closed.
+
+### 6.3 Tests
+
+```powershell
+# Whole suite — 26 tests, one viewer run each
+Game\Plugins\WidgetMarkup\Content\Tests\RunTests.bat
+
+# One test on its own
+Game\Binaries\Win64\WidgetMarkupApp.exe /WidgetMarkup/Tests/TestStarshipStyle --project Game/Game.uproject `
+    --extra-arguments "test -nullrhi -WidgetMarkupTestTimeout=120"
 
 # Clear Python cache before testing (clears BOTH project and plugin paths)
 Get-ChildItem <ProjectDir> -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
 ```
 
 > Always clear caches before testing — stale `.pyc` files can silently load old code.
+
+In test mode a run that passes exits with code 0; a blueprint whose initial compile fails exits with code 7, which is exactly what the negative test (`TestConflict`) asserts.
 
 ## 7. Samples
 
