@@ -127,6 +127,14 @@ The `<WidgetTree>` element is required inside `<WidgetBlueprint>`. It contains o
 
 **[Shared base properties](docs/widgets/shared-properties.md)** — `Visibility`, `IsEnabled`, `RenderOpacity`, `RenderTransform`, `Cursor`, `ToolTipText` (all widgets).
 
+**[Slot types & defaults](docs/widgets/panels.md)** — which slot class each parent creates for its children, and that slot's default `Padding` / `HorizontalAlignment` / `VerticalAlignment` / `Size` (e.g. `UButtonSlot` = `Padding(4,2)` + `Center/Center`, `UOverlaySlot` = `Left/Top`, `USizeBoxSlot` = `Padding(0,0)` + `Fill/Fill`).
+
+**[Widget property defaults](docs/widgets/default-values.md)** — the UMG defaults a style sheet has to override: `TextBlock.Font` = `Roboto 24 Bold`, `ComboBoxString.Font` = `Roboto 16 Bold`, `ContentPadding`/`ForegroundColor` on `ComboBoxString`, `SpinBox.Font` = `Roboto 12 Bold`, `TextBlock.ShadowOffset` = `(1,1)`, and the fact that every `WidgetStyle` starts from UMG's own default style set rather than `FAppStyle`.
+
+**[Complete class defaults](docs/widgets/class-defaults.md)** — every reflected property of every supported widget class (`TextBlock`, `Image`, `Slider`, `ScrollBox`, …) with the value it has when markup does not set it, dumped from the live class default objects. Look here when you need to know what an unconfigured property defaults to.
+
+**[Struct docs](docs/structs/)** — `FSlateBrush`, `FSlateFontInfo`, `FMargin`, `FVector2D`, `FLinearColor`, `FSlateColor`, `FAnchors`/`FAnchorData`, `FSlateChildSize`, `FWidgetTransform`: each lists its member defaults (e.g. `FSlateBrush.ImageSize` = `32,32`, `FSlateFontInfo.Size` = `24`, `FSlateChildSize.SizeRule` = `Fill` in the struct but `Automatic` in the box slots).
+
 **Widget reference:**
 
 | Widget | File | Key bindings |
@@ -164,6 +172,10 @@ The `<WidgetTree>` element is required inside `<WidgetBlueprint>`. It contains o
 > **Slot property timing:** Slot properties (e.g. `Slot.Row`, `Slot.Size.SizeRule`) are resolved AFTER `OnAddChild` creates the slot object (`UPanelWidget::AddChild`), so they work for any panel-managed widget. Root widgets (direct children of `<WidgetTree>`) have no slot — do NOT set `Slot.*` on them.
 >
 > **Slot vs container properties:** Properties on **child** widgets use `Slot.` prefix (they apply to the slot created by the parent panel). Properties on the **panel itself** (e.g. `RowFill`, `ColumnFill`, `bAutoSize`) use bare names — they belong to the container, not the slot.
+>
+> **Slot defaults:** the slot object always starts from its class defaults (see [panels.md](docs/widgets/panels.md)) — e.g. `<Button>` gives its child a `UButtonSlot` with `Padding(4,2)` and **`Center`/`Center`** alignment, while Slate's `SButton` fills its content. That difference is why the same label can land 1 px lower in UMG: a 15 px label centred in a 20 px area sits at `y=…+0.5` and rounds down. Setting `Slot.VerticalAlignment="VAlign_Fill"` on the label reproduces the Slate result.
+>
+> **Slot properties in style sheets:** `<Setter Property="Slot.Padding" Value="4,2,4,2" />` works (the path is resolved at runtime, where the slot object exists). The child-element form (`<Setter Property="Slot.Padding"><Margin …/></Setter>`) does **not** — compile-time resolution runs without an instance and cannot dereference object-pointer segments such as `Slot`, so the setter is dropped with a warning. Use the `Value=` form for slot properties.
 
 **Struct types:** [docs/structs/](docs/structs/) — [FLinearColor](docs/structs/linear-color.md), [FSlateColor](docs/structs/slate-color.md), [FVector2D](docs/structs/vector2d.md), [FMargin](docs/structs/margin.md), [FSlateBrush](docs/structs/slate-brush.md), [FWidgetTransform](docs/structs/render-transform.md), [FSlateChildSize](docs/structs/slate-child-size.md), [FAnchors](docs/structs/anchors.md), [FAnchorData](docs/structs/anchor-data.md), [FSlateFontInfo](docs/structs/font-info.md), [ESlateVisibility](docs/structs/slate-visibility.md), [Alignment](docs/structs/alignment.md)
 
