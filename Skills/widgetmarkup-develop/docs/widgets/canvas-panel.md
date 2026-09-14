@@ -1,15 +1,19 @@
 # CanvasPanel
 
-Free-form positioning via `UCanvasPanelSlot`.
+Free-form positioning via `UCanvasPanelSlot`. Defaults below are UMG's
+(`UCanvasPanelSlot::UCanvasPanelSlot`).
 
-| Slot Property | Type | Description |
-|---|---|---|
-| `LayoutData.Anchors.Minimum` | `FVector2D` | Anchor corner (0–1) |
-| `LayoutData.Anchors.Maximum` | `FVector2D` | Anchor corner (0–1) |
-| `LayoutData.Alignment` | `FVector2D` | Pivot alignment (0–1) |
-| `LayoutData.Offsets` | `FMargin` | Position X, Y, Width, Height in pixels |
-| `bAutoSize` | `bool` | Slot size follows child's desired size (editor: "Size To Content") |
-| `ZOrder` | `int32` | Render order, higher = on top |
+| Slot Property | Type | Default | Description |
+|---|---|---|---|
+| `LayoutData.Anchors.Minimum` | `FVector2D` | `0,0` | Anchor corner (0–1) |
+| `LayoutData.Anchors.Maximum` | `FVector2D` | `0,0` | Anchor corner (0–1) |
+| `LayoutData.Alignment` | `FVector2D` | `0,0` | Pivot alignment (0–1) |
+| `LayoutData.Offsets` | `FMargin` | `0,0,100,30` | Position X, Y, Width, Height in pixels |
+| `bAutoSize` | `bool` | `false` | Slot size follows child's desired size (editor: "Size To Content") |
+| `ZOrder` | `int32` | `0` | Render order, higher = on top |
+
+With `Anchors.Minimum == Anchors.Maximum` the offsets mean "position + size"; with
+different anchors they are insets from the anchor rectangle.
 
 ```xml
 <CanvasPanel>

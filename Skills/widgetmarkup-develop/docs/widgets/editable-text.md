@@ -11,14 +11,14 @@ Inherits from: [shared-properties.md](shared-properties.md)
 
 **Common attributes:**
 
-| Attribute | Type | Description |
-|---|---|---|
-| `Text` | `FText` | Current text, supports `{binding}` |
-| `HintText` | `FText` | Placeholder text |
-| `IsReadOnly` | `bool` | Prevent editing |
-| `IsPassword` | `bool` | Mask characters |
-| `MinimumDesiredWidth` | `float` | Min width |
-| `SelectAllTextWhenFocused` | `bool` | Auto-select on focus |
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `Text` | `FText` | (empty) | Current text, supports `{binding}` |
+| `HintText` | `FText` | (empty) | Placeholder text |
+| `IsReadOnly` | `bool` | `false` | Prevent editing |
+| `IsPassword` | `bool` | `false` | Mask characters |
+| `MinimumDesiredWidth` | `float` | `0` | Min width |
+| `SelectAllTextWhenFocused` | `bool` | `false` | Auto-select on focus |
 
 **Delegates:**
 

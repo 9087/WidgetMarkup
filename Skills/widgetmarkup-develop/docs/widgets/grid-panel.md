@@ -1,18 +1,32 @@
 # GridPanel
 
-Grid layout via `UGridSlot`.
+`UGridPanel : UPanelWidget` — Grid layout.
 
-| Slot Property | Type | Description |
-|---|---|---|
-| `Row` | `int32` | Zero-based row index |
-| `Column` | `int32` | Zero-based column index |
-| `RowSpan` | `int32` | Number of rows to span |
-| `ColumnSpan` | `int32` | Number of columns to span |
-| `Layer` | `int32` | Z-order layer within grid |
-| `Nudge` | `FVector2D` | Pixel offset from cell position |
-| `Padding` | `FMargin` | Internal spacing |
-| `HorizontalAlignment` | `EHorizontalAlignment` | Content H-align |
-| `VerticalAlignment` | `EVerticalAlignment` | Content V-align |
+Inherits from: [shared-properties.md](shared-properties.md)
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `ColumnFill` | `Array(Float)` | (empty) | Star weight per column — see [Star-Sized Rows & Columns](#star-sized-rows--columns) |
+| `RowFill` | `Array(Float)` | (empty) | Star weight per row |
+
+## Slot
+
+Defaults below are UMG's (`UGridSlot::UGridSlot`).
+
+| Slot Property | Type | Default | Description |
+|---|---|---|---|
+| `Row` | `int32` | `0` | Zero-based row index |
+| `Column` | `int32` | `0` | Zero-based column index |
+| `RowSpan` | `int32` | `1`\* | Number of rows to span |
+| `ColumnSpan` | `int32` | `1`\* | Number of columns to span |
+| `Layer` | `int32` | `0` | Z-order layer within grid |
+| `Nudge` | `FVector2D` | `0,0` | Pixel offset from cell position |
+| `Padding` | `FMargin` | `0` | Internal spacing |
+| `HorizontalAlignment` | `EHorizontalAlignment` | `HAlign_Fill` | Content H-align |
+| `VerticalAlignment` | `EVerticalAlignment` | `VAlign_Fill` | Content V-align |
+
+\* `UGridSlot::RowSpan` / `ColumnSpan` are zero-initialised UPROPERTYs, but `SGridPanel`
+clamps them with `FMath::Max(1, …)`, so `1` is what actually takes effect.
 
 ```xml
 <GridPanel>

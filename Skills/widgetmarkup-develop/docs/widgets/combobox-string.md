@@ -4,12 +4,12 @@
 
 Inherits from: [shared-properties.md](shared-properties.md)
 
-| Attribute | Type | Description |
-|---|---|---|
-| `DefaultOptions` | container (child elements) | Dropdown options — a string value is a compile error, see SKILL.md §3.4 |
-| `SelectedOption` | `FString` | Selected item |
-| `MaxListHeight` | `float` | Dropdown max height |
-| `HasDownArrow` | `bool` | Show arrow indicator |
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `DefaultOptions` | container (child elements) | (empty) | Dropdown options — a string value is a compile error, see SKILL.md §3.4 |
+| `SelectedOption` | `FString` | (empty) | Selected item |
+| `MaxListHeight` | `float` | `450` | Dropdown max height |
+| `HasDownArrow` | `bool` | `true` | Show arrow indicator |
 
 **Delegate:**
 

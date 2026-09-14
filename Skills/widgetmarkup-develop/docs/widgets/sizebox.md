@@ -4,14 +4,14 @@
 
 Inherits from: [shared-properties.md](shared-properties.md)
 
-| Attribute | Type | Description |
-|---|---|---|
-| `WidthOverride` | `float` | Fixed width |
-| `HeightOverride` | `float` | Fixed height |
-| `MinDesiredWidth` | `float` | Minimum width |
-| `MinDesiredHeight` | `float` | Minimum height |
-| `MaxDesiredWidth` | `float` | Maximum width |
-| `MaxDesiredHeight` | `float` | Maximum height |
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `WidthOverride` | `float` | `0` | Fixed width |
+| `HeightOverride` | `float` | `0` | Fixed height |
+| `MinDesiredWidth` | `float` | `0` | Minimum width |
+| `MinDesiredHeight` | `float` | `0` | Minimum height |
+| `MaxDesiredWidth` | `float` | `0` | Maximum width |
+| `MaxDesiredHeight` | `float` | `0` | Maximum height |
 
 ```xml
 <SizeBox WidthOverride="200" HeightOverride="100">
@@ -19,4 +19,4 @@ Inherits from: [shared-properties.md](shared-properties.md)
 </SizeBox>
 ```
 
-**Slot:** Padding ([FMargin](../structs/margin.md)), [Alignment](../structs/alignment.md) — see [panels.md](panels.md#sizebox-slot).
+**Slot** (`USizeBoxSlot`): `Padding` ([FMargin](../structs/margin.md)) — default **`0,0`**; [Alignment](../structs/alignment.md) — default **`Fill` / `Fill`**. See [panels.md](panels.md#sizebox-slot).

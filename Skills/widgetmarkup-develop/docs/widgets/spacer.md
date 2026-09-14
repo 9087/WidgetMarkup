@@ -4,9 +4,9 @@
 
 Inherits from: [shared-properties.md](shared-properties.md)
 
-| Attribute | Type | Description |
-|---|---|---|
-| `Size` | [FVector2D](../structs/vector2d.md) | `"10,20"` = Width, Height |
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `Size` | [FVector2D](../structs/vector2d.md) | `1,1` | `"10,20"` = Width, Height |
 
 ```xml
 <Spacer Size="10,20" />

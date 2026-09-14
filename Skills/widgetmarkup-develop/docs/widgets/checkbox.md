@@ -4,13 +4,15 @@
 
 Inherits from: [shared-properties.md](shared-properties.md)
 
-| Attribute | Type | Description |
-|---|---|---|
-| `CheckedState` | `ECheckBoxState` | `Unchecked`, `Checked`, `Undetermined` |
-| `IsChecked` | `bool` | Shorthand (true=Checked, false=Unchecked), supports `{binding}` |
-| `HorizontalAlignment` | [EHorizontalAlignment](../structs/alignment.md) | Content H-align |
-| `ClickMethod` | `EButtonClickMethod` | See [Button](button.md) |
-| `IsFocusable` | `bool` | Keyboard focusable |
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `CheckedState` | `ECheckBoxState` | `Unchecked` | `Unchecked`, `Checked`, `Undetermined`. Bind a Python string holding the value name: `CheckedState="{state}"` |
+| `HorizontalAlignment` | [EHorizontalAlignment](../structs/alignment.md) | `HAlign_Fill` | Content H-align |
+| `ClickMethod` | `EButtonClickMethod` | `DownAndUp` | See [Button](button.md) |
+| `IsFocusable` | `bool` | `true` | Keyboard focusable |
+
+> **There is no `IsChecked` attribute.** `UCheckBox` only exposes `IsChecked()` / `SetIsChecked()` as Blueprint functions; markup attributes resolve *properties*, so `IsChecked="…"` fails to compile:
+> `PropertyPathResolver: FindPropertyByName FAILED for 'IsChecked'` → `CompileFromSourceCode failed`. Use `CheckedState`.
 
 **Delegate:**
 
@@ -19,7 +21,7 @@ Inherits from: [shared-properties.md](shared-properties.md)
 | `OnCheckStateChanged` | `(bool bIsChecked)` |
 
 ```xml
-<CheckBox IsChecked="{checked}" OnCheckStateChanged="on_toggle">
+<CheckBox CheckedState="{checked_state}" OnCheckStateChanged="on_toggle">
   <TextBlock Text="Enable Feature" />
 </CheckBox>
 ```

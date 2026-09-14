@@ -2,13 +2,13 @@
 
 All widgets inherit from `UWidget`. These properties are available on every widget.
 
-| Attribute | Type | Description |
-|---|---|---|
-| `Visibility` | [ESlateVisibility](../structs/slate-visibility.md) | `Visible`, `Collapsed`, `Hidden`, `HitTestInvisible`, `SelfHitTestInvisible` |
-| `IsEnabled` | `bool` | Enable/disable interaction |
-| `RenderOpacity` | `float` | 0.0–1.0 opacity |
-| `Cursor` | `EMouseCursor` | `Default`, `Hand`, `TextEditBeam`, etc. |
-| `ToolTipText` | `FText` | Tooltip text |
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `Visibility` | [ESlateVisibility](../structs/slate-visibility.md) | `Visible` | `Visible`, `Collapsed`, `Hidden`, `HitTestInvisible`, `SelfHitTestInvisible` |
+| `IsEnabled` | `bool` | `true` | Enable/disable interaction |
+| `RenderOpacity` | `float` | `1` | 0.0–1.0 opacity |
+| `Cursor` | `EMouseCursor` | `Default` | `Default`, `Hand`, `TextEditBeam`, etc. |
+| `ToolTipText` | `FText` | (empty) | Tooltip text |
 
 **RenderTransform** — See [FWidgetTransform](../structs/render-transform.md) for full details. All widgets support these dotted paths:
 

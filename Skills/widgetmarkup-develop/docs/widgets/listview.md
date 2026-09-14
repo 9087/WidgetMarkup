@@ -4,12 +4,23 @@ Scrollable item lists. See [python-components.md](../python-components.md) for f
 
 Inherits from: [shared-properties.md](shared-properties.md)
 
-| Attribute | Type | Description |
-|---|---|---|
-| `ListItems` | `{binding}` or child elements | List items — a reactive binding, or objects declared inline |
-| `EntryWidgetClass` | `/Path/To/Entry` | Entry blueprint path |
-| `Orientation` | `EOrientation` | Scroll direction |
-| `ScrollBarVisibility` | `ESlateVisibility` | Scroll bar visibility |
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `ListItems` | `{binding}` or child elements | (empty) | List items — a reactive binding, or objects declared inline |
+| `EntryWidgetClass` | `/Path/To/Entry` | `None` | Entry blueprint path |
+| `Orientation` | `EOrientation` | `Orient_Vertical` | Scroll direction |
+| `SelectionMode` | `ESelectionMode` | `Single` | `Single`, `SingleToggle`, `Multi`, `None` |
+| `EntrySpacing` | `float` | `0` | Spacing between entries (both axes) |
+| `HorizontalEntrySpacing` / `VerticalEntrySpacing` | `float` | `0` | Per-axis spacing; `-1` falls back to `EntrySpacing` |
+| `ConsumeMouseWheel` | `EConsumeMouseWheel` | `WhenScrollingPossible` | Whether the list swallows the wheel event |
+| `bClearSelectionOnClick` | `bool` | `false` | Clear the selection when clicking empty space |
+| `bIsFocusable` | `bool` | `true` | Keyboard focusable |
+| `bReturnFocusToSelection` | `bool` | `false` | Return focus to the selected entry |
+
+> **`ScrollBarVisibility` is not an attribute.** `UListViewBase` only exposes the Blueprint
+> function `SetScrollbarVisibility()`; there is no reflected property, and markup attributes
+> resolve properties only. Use the widget's `ScrollBarStyle` / scrolling flags instead, or
+> call the setter from Python.
 
 **Binding** (the usual form — see [python-components.md](../python-components.md)):
 
