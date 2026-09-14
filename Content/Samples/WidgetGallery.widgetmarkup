@@ -79,7 +79,7 @@
                那一行里的文字/开关会被拉伸到整行高（比参考高 5px、内容上移 3px）。 -->
           <HorizontalBox Slot.Padding="0,0,0,10">
             <CheckBox Slot.Padding="0,0,8,0" />
-            <TextBlock Text="CheckBox" Slot.Padding="0,0,20,0" Slot.VerticalAlignment="VAlign_Center" />
+            <TextBlock Text="Checkbox" Slot.Padding="0,0,20,0" Slot.VerticalAlignment="VAlign_Center" />
             <CheckBox Style="CheckboxLookToggleButtonCheckbox" Slot.Padding="0,0,8,0" />
             <TextBlock Text="ToggleButton look" Slot.Padding="0,0,20,0" Slot.VerticalAlignment="VAlign_Center" />
             <SizeBox WidthOverride="160" HeightOverride="20" Slot.VerticalAlignment="VAlign_Center">
