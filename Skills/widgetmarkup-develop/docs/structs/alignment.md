@@ -26,6 +26,8 @@ Control how content aligns within its slot. Use the **UE enum entry names** (cas
 </TextBlock>
 ```
 
+> **Default when unset:** the value depends on the owner. Panel slots differ — `UOverlaySlot` / `UUniformGridSlot` default to `HAlign_Left` / `VAlign_Top`, the box/grid/scroll slots to `HAlign_Fill` / `VAlign_Fill`, and `UButtonSlot` / `UScaleBoxSlot` to `HAlign_Center` / `VAlign_Center`. See [panels.md](../widgets/panels.md) for the full table.
+
 > **Reading back in Python:** Python enum members use UPPER_SNAKE_CASE:
 > ```python
 > slot.get_editor_property("HorizontalAlignment") == unreal.HorizontalAlignment.H_ALIGN_FILL

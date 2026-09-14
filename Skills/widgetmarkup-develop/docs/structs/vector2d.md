@@ -4,6 +4,8 @@
 
 **Format:** `"X,Y"`.
 
+**Member defaults** (`FVector2D()`): `X` = `0`, `Y` = `0`.
+
 | Example | Meaning |
 |---|---|
 | `"10,20"` | X=10, Y=20 |

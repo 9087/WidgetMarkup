@@ -4,6 +4,8 @@
 
 **Format:** `"Left,Top,Right,Bottom"`.
 
+**Member defaults** (`FMargin()`): `Left` / `Top` / `Right` / `Bottom` are all `0`.
+
 | Example | Meaning |
 |---|---|
 | `"4,4,4,4"` | Uniform 4px on all sides |

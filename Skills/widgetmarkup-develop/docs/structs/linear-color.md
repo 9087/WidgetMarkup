@@ -12,6 +12,8 @@ RGBA color with float components (0–1). Used by most color properties.
 
 **Python:** Use `unreal.LinearColor(r, g, b, a)`.
 
+**Member defaults** (`FLinearColor()`, and therefore any widget colour property you never set): `R` / `G` / `B` / `A` are all `0` — transparent black. Note the string form differs: `"R,G,B"` goes through the converter, which fills `A` with `1.0`.
+
 > **Reading back in Python:** Access via `.r`, `.g`, `.b`, `.a`:
 > ```python
 > co = widget.get_editor_property("ColorAndOpacity")

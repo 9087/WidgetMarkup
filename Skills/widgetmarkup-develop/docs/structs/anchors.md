@@ -2,10 +2,10 @@
 
 Defines how a CanvasPanel slot anchors to its parent. Anchors are normalized 0–1 coordinates.
 
-| Path | Type | Description |
+| Path | Type | Default | Description |
 |---|---|---|
-| `LayoutData.Anchors.Minimum` | `"X,Y"` | Upper-left anchor point |
-| `LayoutData.Anchors.Maximum` | `"X,Y"` | Lower-right anchor point |
+| `LayoutData.Anchors.Minimum` | `"X,Y"` | `0,0` | Upper-left anchor point |
+| `LayoutData.Anchors.Maximum` | `"X,Y"` | `0,0` | Lower-right anchor point |
 
 | Values | Behavior |
 |---|---|
